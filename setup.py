@@ -21,6 +21,12 @@ setup(
     author="Zhaofeng Wu",
     author_email="zfw7@cs.washington.edu",
     packages=["paoding"],
-    install_requires=["torch==1.9.0"],
+    install_requires=[
+        "numpy==1.12.1",
+        "pytorch-lightning==1.4.2",
+        "torch==1.9.0",
+        "tqdm==4.62.0",
+        "transformers==4.9.2",
+    ],
     python_requires=">=3.9.0",
 )
