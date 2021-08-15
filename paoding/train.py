@@ -23,7 +23,7 @@ class LoggingCallback(pl.Callback):
         self.best_dev_metrics = None
 
     @rank_zero_only
-    def on_validation_end(self, trainer, pl_module):
+    def on_validation_end(self, trainer: pl.Trainer, pl_module: BaseModel):
         logger.info("")
         logger.info("***** Validation results *****")
 
