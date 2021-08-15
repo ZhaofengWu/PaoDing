@@ -12,6 +12,14 @@ class BaseModel(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
+    @property
+    def metric_to_watch(self):
+        raise NotImplementedError("This is an abstract class; do not use it directly!")
+
+    @property
+    def metric_watch_mode(self):
+        raise NotImplementedError("This is an abstract class; do not use it directly!")
+
     def setup(self, mode: str) -> None:
         """To set up self.dataset_size"""
         if mode != "train":
