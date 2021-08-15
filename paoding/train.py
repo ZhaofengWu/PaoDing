@@ -10,7 +10,7 @@ from pytorch_lightning.utilities import rank_zero_only
 
 reload(logging)
 
-from paoding.base_model import BaseModel
+from paoding.models.base_model import BaseModel
 
 
 logger = logging.getLogger(__name__)
