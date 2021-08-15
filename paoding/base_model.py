@@ -92,8 +92,10 @@ class BaseModel(pl.LightningModule):
     def add_model_specific_args(parser: argparse.ArgumentParser):
         parser.add_argument("--learning_rate", default=2e-5, type=float)
         parser.add_argument("--weight_decay", default=0.0, type=float)
+        parser.add_argument("--gradient_clip_val", default=1.0, type=float)
+        parser.add_argument("--accumulate_grad_batches", default=1, type=int)
         parser.add_argument("--adam_epsilon", default=1e-8, type=float)
         parser.add_argument("--warmup_steps", default=0, type=int)
-        parser.add_argument("--max_epochs", default=3, type=int)
+        parser.add_argument("--epochs", default=3, type=int, dest="max_epochs")
         parser.add_argument("--batch_size", default=32, type=int)
         parser.add_argument("--eval_batch_size", default=32, type=int)
