@@ -1,7 +1,12 @@
 import argparse
-from typing import Optional
+from collections import defaultdict
+from typing import Any, Optional, Union
 
+import numpy as np
 import pytorch_lightning as pl
+from pytorch_lightning.utilities.apply_func import apply_to_collection
+import torch
+import torch.nn.functional as F
 from torch.optim import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from transformers import get_linear_schedule_with_warmup
@@ -123,6 +128,62 @@ class BaseModel(pl.LightningModule):
             optimizer, num_warmup_steps=self.hparams.warmup_steps, num_training_steps=total_steps
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
+
+    def step(self, batch) -> dict[str, Any]:
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    def compute_loss(self, logits, labels):
+        if self.dataset.output_mode == "classification":
+            loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))
+        elif self.dataset.output_mode == "regression":
+            loss = F.mse_loss(logits.view(-1), labels.view(-1))
+        else:
+            raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
+        return loss
+
+    def training_step(self, batch, batch_idx) -> dict[str, Any]:
+        self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
+        return {"loss": self.compute_loss(self._step(batch)["logits"], batch["labels"])}
+
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        output = {
+            "logits": self._step(batch)["logits"],
+            "labels": batch["labels"],
+        }
+        return apply_to_collection(output, torch.Tensor, lambda t: t.detach.cpu())
+
+    def compute_metrics(self, outputs: dict[str, Any]) -> dict[str, Union[int, float]]:
+        # TODO: is this a list of dict? np.array or tensor?
+        logits = np.concatenate([output["logits"] for output in outputs], axis=0)
+        if self.dataset.output_mode == "classification":
+            preds = np.argmax(logits, axis=1)
+        elif self.dataset.output_mode == "regression":
+            preds = np.squeeze(logits)
+        else:
+            raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
+
+        # TODO: here too
+        labels = np.concatenate([output["labels"] for output in outputs], axis=0)
+        return self.dataset.compute_metrics(predictions=preds, references=labels)
+
+    def validation_epoch_end(self, outputs: Union[dict[str, Any], list[dict[str, Any]]]):
+        logs = {}
+        if isinstance(outputs, list):
+            assert len(outputs) > 1
+            # Each dataloader has its own individual metrics suffixed with its index,
+            # and we also aggregate (average) metrics across dataloaders
+            sums = defaultdict(int)
+            for i, one_split_outputs in enumerate(outputs):
+                metrics = self.compute_metrics(one_split_outputs)
+                for k, v in metrics.items():
+                    logs[k + str(i + 1)] = v
+                    sums[k] += v
+            logs.update({k: v / len(outputs) for k, v in sums.items()})
+        else:
+            logs.update(self.compute_metrics(outputs))
+
+        for k, v in logs.items():
+            self.log(k, v)
 
     def test_step(self, batch, batch_idx: int):
         return self.validation_step(batch, batch_idx)
