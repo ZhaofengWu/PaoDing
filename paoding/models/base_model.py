@@ -21,6 +21,9 @@ class BaseModel(pl.LightningModule):
     def __init__(self, hparam: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters()
+        # pytorch-lightning calls this, but we call it ourselves here in case the __init__ of
+        # children modules need dataset attributes, e.g., num_labels
+        self.prepare_data()
 
     @property
     def pad_token_id(self):
