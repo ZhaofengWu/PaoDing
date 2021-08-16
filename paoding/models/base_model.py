@@ -1,4 +1,5 @@
 import argparse
+from typing import Optional
 
 import pytorch_lightning as pl
 from torch.optim import Optimizer
@@ -20,9 +21,9 @@ class BaseModel(pl.LightningModule):
     def metric_watch_mode(self):
         raise NotImplementedError("This is an abstract class; do not use it directly!")
 
-    def setup(self, mode: str) -> None:
+    def setup(self, stage: Optional[str] = None) -> None:
         """To set up self.dataset_size"""
-        if mode != "train":
+        if stage != "fit":
             return
 
         self._train_dataloader = self.get_dataloader("train", self.hparams.batch_size, shuffle=True)
