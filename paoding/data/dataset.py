@@ -6,8 +6,8 @@ import torch
 
 
 class Dataset:
-    def __init__(self, hparam: argparse.Namespace):
-        cache_file = self._cache_path()
+    def __init__(self, hparam: argparse.Namespace, cache_suffix=""):
+        cache_file = self._cache_path(suffix=cache_suffix)
         if os.path.exists(cache_file):
             self.data = pickle.load(open(cache_file, "rb"))
             return
@@ -19,8 +19,10 @@ class Dataset:
     def __getitem__(self, split: str):
         pass  # TODO
 
-    def _cache_path(self) -> str:
+    def _cache_path(self, suffix="") -> str:
+        escape = lambda s: s.replace("/", "_")
         pass  # TODO
+        # "name_{suffix}"
 
     @property
     def metric_to_watch(self):
@@ -35,7 +37,14 @@ class Dataset:
         pass  # TODO
 
     @property
+    def num_labels(self):
+        pass  # TODO
+
+    @property
     def sort_key(self):
+        pass  # TODO
+
+    def compute_metrics(self, todo):
         pass  # TODO
 
     @staticmethod
