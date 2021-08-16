@@ -49,6 +49,13 @@ class Dataset:
 
     @staticmethod
     def add_data_args(parser: argparse.ArgumentParser):
+        parser.add_argument(
+            "--max_seq_length",
+            default=None,
+            type=int,
+            help="The maximum sequence length after tokenization, for both source and target. "
+            "Sequences longer than this will be truncated.",
+        )
         pass  # TODO
 
 
