@@ -10,6 +10,7 @@ from pytorch_lightning.utilities import rank_zero_only
 
 reload(logging)
 
+from paoding.data.dataset import Dataset
 from paoding.models.base_model import BaseModel
 
 
@@ -71,7 +72,8 @@ def add_generic_args(parser: argparse.ArgumentParser):
 def train(model_class: BaseModel, args=None, extra_dump_args=None):
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
-    parser = model_class.add_model_specific_args(parser)
+    model_class.add_model_specific_args(parser)
+    Dataset.add_data_args(parser)
     args = parser.parse_args(args=args)
 
     output_dir = args.default_root_dir

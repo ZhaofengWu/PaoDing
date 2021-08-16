@@ -7,6 +7,10 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import get_linear_schedule_with_warmup
 from transformers import AdamW
 
+from paoding.data.collator import collate_fn
+from paoding.data.dataset import Dataset
+from paoding.data.sortish_sampler import make_sortish_sampler
+
 
 class BaseModel(pl.LightningModule):
     def __init__(self, hparam: argparse.Namespace):
@@ -14,40 +18,64 @@ class BaseModel(pl.LightningModule):
         self.save_hyperparameters()
 
     @property
-    def metric_to_watch(self):
-        raise NotImplementedError("This is an abstract class; do not use it directly!")
+    def pad_token_id(self):
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     @property
-    def metric_watch_mode(self):
-        raise NotImplementedError("This is an abstract class; do not use it directly!")
+    def pad_token_type_id(self):
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    @property
+    def padding_side(self):
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    def prepare_data(self):
+        self.dataset = Dataset(self.hparams)
+
+    def _get_dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
+        dataset_split = self.dataset[split]
+        lens = [len(ids) for ids in dataset_split[self.dataset.sort_key]]
+        sampler = make_sortish_sampler(
+            lens, batch_size, distributed=self.hparams.gpus > 1, perturb=shuffle
+        )
+        dataloader = DataLoader(
+            dataset_split,
+            batch_size=batch_size,
+            sampler=sampler,
+            collate_fn=lambda batch: collate_fn(
+                batch,
+                self.pad_token_id,
+                self.pad_token_type_id,
+                self.padding_side,
+                self.dataset.output_mode,
+            ),
+        )
+        return dataloader
 
     def setup(self, stage: Optional[str] = None) -> None:
         """To set up self.dataset_size"""
         if stage != "fit":
             return
 
-        self._train_dataloader = self.get_dataloader("train", self.hparams.batch_size, shuffle=True)
+        self._train_dataloader = self._get_dataloader("train", self.hparams.batch_size, shuffle=True)
         self.dataset_size = len(self._train_dataloader.dataset)
-
-    def get_dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
-        raise NotImplementedError("You must implement this for your task")
 
     def train_dataloader(self) -> DataLoader:
         return self._train_dataloader
 
     def val_dataloader(self, shuffle=False) -> list[DataLoader]:
-        dataloaders = [self.get_dataloader("dev", self.args.eval_batch_size, shuffle=shuffle)]
+        dataloaders = [self._get_dataloader("dev", self.args.eval_batch_size, shuffle=shuffle)]
         if self.has_secondary_split:
             dataloaders.append(
-                self.get_dataloader("dev2", self.args.eval_batch_size, shuffle=shuffle)
+                self._get_dataloader("dev2", self.args.eval_batch_size, shuffle=shuffle)
             )
         return dataloaders
 
     def test_dataloader(self, shuffle=False) -> list[DataLoader]:
-        dataloaders = [self.get_dataloader("test", self.args.eval_batch_size, shuffle=shuffle)]
+        dataloaders = [self._get_dataloader("test", self.args.eval_batch_size, shuffle=shuffle)]
         if self.has_secondary_split:
             dataloaders.append(
-                self.get_dataloader("test2", self.args.eval_batch_size, shuffle=shuffle)
+                self._get_dataloader("test2", self.args.eval_batch_size, shuffle=shuffle)
             )
         return dataloaders
 
