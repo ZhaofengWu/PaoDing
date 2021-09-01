@@ -1,6 +1,6 @@
 # PaoDing
 
-An NLP-oriented PyTorch wrapper that makes your life easier.
+An NLP-oriented PyTorch wrapper that makes your life easier. It is in spirit similar to AllenNLP. I created it so that I don't have to dig through the codebase to understand how something works in other libraries or create a PR every time I find something inconvenient to use.
 
 ## Etymology
 
