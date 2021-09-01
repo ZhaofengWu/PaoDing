@@ -43,11 +43,6 @@ class Transformer(BaseModel):
             ),
             **config_kwargs,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.hparams.tokenizer_name
-            if self.hparams.tokenizer_name
-            else self.hparams.model_name_or_path,
-        )
         self.model = MODEL_MODES[self.hparams.task].from_pretrained(
             self.hparams.model_name_or_path, config=self.config
         )
@@ -81,12 +76,6 @@ class Transformer(BaseModel):
             type=str,
             required=True,
             help="Path to pretrained model or model identifier from huggingface.co/models",
-        )
-        parser.add_argument(
-            "--tokenizer_name",
-            default=None,
-            type=str,
-            help="Pretrained tokenizer name or path if not the same as model_name",
         )
 
         return parser
