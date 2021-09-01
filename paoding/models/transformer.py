@@ -63,13 +63,6 @@ class Transformer(BaseModel):
             input["token_type_ids"] = batch["token_type_ids"]
         return self(**input)
 
-    @property
-    def dataset_cache_suffix(self):
-        return (
-            f"{self.hparams.tokenizer_name or self.hparams.model_name_or_path}"
-            f"_{self.hparams.max_seq_length}"
-        )
-
     @staticmethod
     def add_model_specific_args(parser):
         BaseModel.add_model_specific_args(parser)

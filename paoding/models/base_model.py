@@ -37,13 +37,8 @@ class BaseModel(pl.LightningModule):
     def padding_side(self):
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
-    @property
-    def dataset_cache_suffix(self):
-        # Include properties that cause a dataset to be preprocessed differently, e.g., tokenizer
-        return ""
-
     def prepare_data(self):
-        self.dataset = Dataset(self.hparams, cache_suffix=self.dataset_cache_suffix)
+        self.dataset = Dataset(self.hparams)
 
     def _get_dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset[split]

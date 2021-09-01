@@ -69,11 +69,11 @@ def add_generic_args(parser: argparse.ArgumentParser):
     parser.add_argument("--seed", type=int, default=42)
 
 
-def train(model_class: BaseModel, args=None, extra_dump_args=None):
+def train(model_class: BaseModel, dataset_class: Dataset, args=None, extra_dump_args=None):
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
     model_class.add_model_specific_args(parser)
-    Dataset.add_data_args(parser)
+    dataset_class.add_args(parser)
     args = parser.parse_args(args=args)
 
     output_dir = args.default_root_dir
