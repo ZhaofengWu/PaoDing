@@ -18,7 +18,7 @@ from paoding.models.base_model import BaseModel
 logger = logging.getLogger(__name__)
 
 
-MODEL_MODES = {
+TASKS = {
     "base": AutoModel,
     "sequence-classification": AutoModelForSequenceClassification,
     "question-answering": AutoModelForQuestionAnswering,
@@ -43,7 +43,7 @@ class Transformer(BaseModel):
             ),
             **config_kwargs,
         )
-        self.model = MODEL_MODES[self.hparams.task].from_pretrained(
+        self.model = TASKS[self.hparams.task].from_pretrained(
             self.hparams.model_name_or_path, config=self.config
         )
 
@@ -59,15 +59,15 @@ class Transformer(BaseModel):
         return self(**input)
 
     @staticmethod
-    def add_model_specific_args(parser):
-        BaseModel.add_model_specific_args(parser)
+    def add_args(parser):
+        BaseModel.add_args(parser)
 
         parser.add_argument(
             "--task",
             default=None,
             type=str,
             required=True,
-            choices=MODEL_MODES.keys(),
+            choices=TASKS.keys(),
             help="The task of the model.",
         )
         parser.add_argument(

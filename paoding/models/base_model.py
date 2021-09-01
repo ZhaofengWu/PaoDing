@@ -190,7 +190,7 @@ class BaseModel(pl.LightningModule):
         return self.validation_epoch_end(outputs)
 
     @staticmethod
-    def add_model_specific_args(parser: argparse.ArgumentParser):
+    def add_args(parser: argparse.ArgumentParser):
         parser.add_argument("--learning_rate", default=2e-5, type=float)
         parser.add_argument("--weight_decay", default=0.0, type=float)
         parser.add_argument("--gradient_clip_val", default=1.0, type=float)

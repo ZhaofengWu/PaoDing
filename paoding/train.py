@@ -72,7 +72,7 @@ def add_generic_args(parser: argparse.ArgumentParser):
 def train(model_class: BaseModel, dataset_class: Dataset, args=None, extra_dump_args=None):
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
-    model_class.add_model_specific_args(parser)
+    model_class.add_args(parser)
     dataset_class.add_args(parser)
     args = parser.parse_args(args=args)
 
