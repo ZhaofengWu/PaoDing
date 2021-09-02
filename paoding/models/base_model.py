@@ -2,10 +2,9 @@ import argparse
 from collections import defaultdict
 from typing import Any, Optional, Union
 
-import numpy as np
+from allennlp.training.metrics import Metric
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.apply_func import apply_to_collection
-import torch
 import torch.nn.functional as F
 from torch.optim import Optimizer
 from torch.utils.data.dataloader import DataLoader
@@ -24,6 +23,7 @@ class BaseModel(pl.LightningModule):
         # pytorch-lightning calls this, but we call it ourselves here in case the __init__ of
         # children modules need dataset attributes, e.g., num_labels
         self.prepare_data()
+        self.metrics = self.setup_metrics()
 
     @property
     def pad_token_id(self):
@@ -67,6 +67,9 @@ class BaseModel(pl.LightningModule):
 
         self._train_dataloader = self._get_dataloader("train", self.hparams.batch_size, shuffle=True)
         self.dataset_size = len(self._train_dataloader.dataset)
+
+    def setup_metrics(self) -> dict[str, Metric]:
+        return {name: Metric.by_name(name) for name in self.dataset.metric_names}
 
     def train_dataloader(self) -> DataLoader:
         return self._train_dataloader
@@ -144,25 +147,21 @@ class BaseModel(pl.LightningModule):
         return {"loss": self.compute_loss(self._step(batch)["logits"], batch["labels"])}
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        output = {
-            "logits": self._step(batch)["logits"],
-            "labels": batch["labels"],
-        }
-        return apply_to_collection(output, torch.Tensor, lambda t: t.detach.cpu())
+        logits = self._step(batch)["logits"]
+        labels = batch["labels"]
+        assert logits.dim() == 2 and labels.dim() == 1
 
-    def compute_metrics(self, outputs: dict[str, Any]) -> dict[str, Union[int, float]]:
-        # TODO: is this a list of dict? np.array or tensor?
-        logits = np.concatenate([output["logits"] for output in outputs], axis=0)
         if self.dataset.output_mode == "classification":
-            preds = np.argmax(logits, axis=1)
+            preds = logits.argmax(dim=1)
         elif self.dataset.output_mode == "regression":
-            preds = np.squeeze(logits)
+            preds = logits.squeeze(dim=1)
         else:
             raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
 
-        # TODO: here too
-        labels = np.concatenate([output["labels"] for output in outputs], axis=0)
-        return self.dataset.compute_metrics(predictions=preds, references=labels)
+        for metric in self.metrics.values():
+            metric(preds, labels)
+
+        return {"loss": self.compute_loss(logits, labels).detach().cpu()}
 
     def validation_epoch_end(self, outputs: Union[dict[str, Any], list[dict[str, Any]]]):
         logs = {}
@@ -172,16 +171,23 @@ class BaseModel(pl.LightningModule):
             # and we also aggregate (average) metrics across dataloaders
             sums = defaultdict(int)
             for i, one_split_outputs in enumerate(outputs):
-                metrics = self.compute_metrics(one_split_outputs)
+                metrics = self.get_metrics(reset=True)
                 for k, v in metrics.items():
                     logs[k + str(i + 1)] = v
                     sums[k] += v
             logs.update({k: v / len(outputs) for k, v in sums.items()})
         else:
-            logs.update(self.compute_metrics(outputs))
+            logs.update(self.get_metrics(reset=True))
 
         for k, v in logs.items():
             self.log(k, v)
+
+    def get_metrics(self, reset=False) -> dict[str, Any]:
+        metrics = {name: metric.get_metric() for name, metric in self.metrics.items()}
+        if reset:
+            for metric in self.metrics.values():
+                metric.reset()
+        return metrics
 
     def test_step(self, batch, batch_idx: int):
         return self.validation_step(batch, batch_idx)

@@ -9,8 +9,8 @@ from transformers import PreTrainedTokenizerBase
 
 class Dataset:
     """
-    An abstract class representing a dataset (using the HuggingFace datasets), a tokenizer, and
-    metrics.
+    An abstract class representing a dataset (using the HuggingFace datasets), relevant properties,
+    and a tokenizer.
     """
 
     def __init__(self, hparam: argparse.Namespace):
@@ -51,7 +51,7 @@ class Dataset:
         return self.text_key
 
     @property
-    def metrics(self) -> list[str]:
+    def metric_names(self) -> list[str]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     @property

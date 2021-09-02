@@ -22,6 +22,7 @@ setup(
     author_email="zfw7@cs.washington.edu",
     packages=["paoding"],
     install_requires=[
+        "allennlp==2.7.0",
         "datasets==1.11.0",
         "numpy==1.12.1",
         "pytorch-lightning==1.4.2",
