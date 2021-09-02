@@ -8,11 +8,18 @@ from transformers import PreTrainedTokenizerBase
 
 
 class Dataset:
+    """
+    An abstract class representing a dataset (using the HuggingFace datasets), a tokenizer, and
+    metrics.
+    """
+
     def __init__(self, hparam: argparse.Namespace):
         self.hparam = hparam
         if os.path.exists(self.cache_path):
             self.dataset_dict = pickle.load(open(self.cache_path, "rb"))
             return
+
+        self.tokenizer = self.setup_tokenizer()
 
         self.dataset_dict = self.load()
         self.dataset_dict = self.preprocess(self.dataset_dict)
@@ -42,10 +49,6 @@ class Dataset:
     @property
     def sort_key(self) -> str:
         return self.text_key
-
-    @property
-    def tokenizer(self) -> PreTrainedTokenizerBase:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     @property
     def metrics(self) -> list[str]:
@@ -88,6 +91,9 @@ class Dataset:
             del dataset_dict["validation"]
 
         return dataset_dict
+
+    def setup_tokenizer(self) -> PreTrainedTokenizerBase:
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     def compute_metrics(self, todo):
         pass  # TODO
