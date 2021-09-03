@@ -103,9 +103,6 @@ class Dataset:
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
-    def compute_metrics(self, todo):
-        pass  # TODO
-
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
         parser.add_argument(  # subclasses should use this when instantiating the tokenizer
