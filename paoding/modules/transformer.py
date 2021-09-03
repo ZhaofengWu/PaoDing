@@ -1,5 +1,6 @@
 import logging
 
+import torch
 from transformers import (
     AutoConfig,
     AutoModel,
@@ -9,10 +10,7 @@ from transformers import (
     AutoModelForSequenceClassification,
     AutoModelForTokenClassification,
     AutoModelWithLMHead,
-    AutoTokenizer,
 )
-
-from paoding.models.base_model import BaseModel
 
 
 logger = logging.getLogger(__name__)
@@ -30,12 +28,12 @@ TASKS = {
 }
 
 
-class Transformer(BaseModel):
-    def __init__(self, hparams, **config_kwargs):
-        super().__init__(hparams)
+class Transformer(torch.nn.module):
+    def __init__(self, hparams, trainable=True, **config_kwargs):
+        super().__init__()
 
         self.config = AutoConfig.from_pretrained(
-            self.hparams.model_name_or_path,
+            hparams.model_name_or_path,
             **(
                 {"num_labels": self.dataset.num_labels}
                 if self.dataset.num_labels is not None
@@ -43,25 +41,20 @@ class Transformer(BaseModel):
             ),
             **config_kwargs,
         )
-        self.model = TASKS[self.hparams.task].from_pretrained(
-            self.hparams.model_name_or_path, config=self.config
+        self.model = TASKS[hparams.task].from_pretrained(
+            hparams.model_name_or_path, config=self.config
         )
+
+        self.trainable = trainable
 
     def forward(self, *args, **kwargs):
         if "attention_mask" in kwargs:  # `transformers` doesn't take bool masks which is crazy
             kwargs["attention_mask"] = kwargs["attention_mask"].float()
-        return self.model(*args, **kwargs)
-
-    def _step(self, batch):
-        input = {"input_ids": batch["input_ids"], "attention_mask": batch["attention_mask"]}
-        if "token_type_ids" in batch and self.config.model_type != "distilbert":
-            input["token_type_ids"] = batch["token_type_ids"]
-        return self(**input)
+        with torch.set_grad_enabled(self.trainable):
+            return self.model(*args, **kwargs)
 
     @staticmethod
     def add_args(parser):
-        BaseModel.add_args(parser)
-
         parser.add_argument(
             "--task",
             default=None,
