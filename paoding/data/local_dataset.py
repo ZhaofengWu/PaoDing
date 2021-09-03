@@ -20,7 +20,7 @@ class LocalDataset(Dataset):
         dataset_dict = load_dataset(
             *args,
             data_files={
-                split: os.path.join(self.hparam, self.split_filename(split))
+                split: os.path.join(self.hparams, self.split_filename(split))
                 for split in ["train", "dev", "test"]
             },
             **kwargs,

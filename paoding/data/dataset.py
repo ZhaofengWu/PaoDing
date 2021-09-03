@@ -13,8 +13,8 @@ class Dataset:
     and a tokenizer.
     """
 
-    def __init__(self, hparam: argparse.Namespace):
-        self.hparam = hparam
+    def __init__(self, hparams: argparse.Namespace):
+        self.hparams = hparams
         if os.path.exists(self.cache_path):
             self.dataset_dict = pickle.load(open(self.cache_path, "rb"))
             return
@@ -32,7 +32,7 @@ class Dataset:
     def cache_path(self) -> str:
         hash = lambda s: hashlib.md5(s.encode("utf-8")).hexdigest()
         return os.path.join(
-            self.hparam.output_dir,
+            self.hparams.output_dir,
             f"{self.__class__.__name__}_{hash(self.tokenizer.__repr__)}.datacache",
         )
 

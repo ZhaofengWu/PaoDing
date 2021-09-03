@@ -17,7 +17,7 @@ from paoding.data.sortish_sampler import make_sortish_sampler
 
 
 class BaseModel(pl.LightningModule):
-    def __init__(self, hparam: argparse.Namespace):
+    def __init__(self, hparams: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters()
         # pytorch-lightning calls this, but we call it ourselves here in case the __init__ of
