@@ -37,6 +37,14 @@ class Dataset:
         )
 
     @property
+    def dev_splits(self) -> list[str]:
+        return ["dev"]
+
+    @property
+    def test_splits(self) -> list[str]:
+        return ["test"]
+
+    @property
     def text_key(self) -> str:
         """The key in the example dictionary for the main text."""
         return "text"

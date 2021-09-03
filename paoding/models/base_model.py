@@ -65,30 +65,31 @@ class BaseModel(pl.LightningModule):
         if stage != "fit":
             return
 
-        self._train_dataloader = self._get_dataloader("train", self.hparams.batch_size, shuffle=True)
+        self._train_dataloader = self._get_dataloader(
+            "train", self.hparams.batch_size, shuffle=True
+        )
         self.dataset_size = len(self._train_dataloader.dataset)
 
     def setup_metrics(self) -> dict[str, Metric]:
-        return {name: Metric.by_name(name) for name in self.dataset.metric_names}
+        return {
+            split: {name: Metric.by_name(name) for name in self.dataset.metric_names}
+            for split in self.dataset.dev_splits + self.dataset.test_splits
+        }
 
     def train_dataloader(self) -> DataLoader:
         return self._train_dataloader
 
     def val_dataloader(self, shuffle=False) -> list[DataLoader]:
-        dataloaders = [self._get_dataloader("dev", self.args.eval_batch_size, shuffle=shuffle)]
-        if self.has_secondary_split:
-            dataloaders.append(
-                self._get_dataloader("dev2", self.args.eval_batch_size, shuffle=shuffle)
-            )
-        return dataloaders
+        return [
+            self._get_dataloader(split, self.hparams.eval_batch_size, shuffle=shuffle)
+            for split in self.dataset.dev_splits
+        ]
 
     def test_dataloader(self, shuffle=False) -> list[DataLoader]:
-        dataloaders = [self._get_dataloader("test", self.args.eval_batch_size, shuffle=shuffle)]
-        if self.has_secondary_split:
-            dataloaders.append(
-                self._get_dataloader("test2", self.args.eval_batch_size, shuffle=shuffle)
-            )
-        return dataloaders
+        return [
+            self._get_dataloader(split, self.hparams.eval_batch_size, shuffle=shuffle)
+            for split in self.dataset.test_splits
+        ]
 
     def configure_optimizers(self) -> tuple[list[Optimizer], list[dict]]:
         "Prepare optimizer and schedule (linear warmup and decay)"
@@ -146,7 +147,9 @@ class BaseModel(pl.LightningModule):
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
         return {"loss": self.compute_loss(self._step(batch)["logits"], batch["labels"])}
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+    def eval_step(self, batch, batch_idx, mode: str, dataloader_idx=0):
+        assert mode in {"dev", "test"}
+
         logits = self._step(batch)["logits"]
         labels = batch["labels"]
         assert logits.dim() == 2 and labels.dim() == 1
@@ -158,42 +161,54 @@ class BaseModel(pl.LightningModule):
         else:
             raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
 
-        for metric in self.metrics.values():
-            metric(preds, labels)
+        splits = (self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits)
+        split = splits[dataloader_idx]
+        for metric in self.metrics[split].values():
+            metric(*metric.detach_tensors(preds, labels))
 
         return {"loss": self.compute_loss(logits, labels).detach().cpu()}
 
-    def validation_epoch_end(self, outputs: Union[dict[str, Any], list[dict[str, Any]]]):
-        logs = {}
-        if isinstance(outputs, list):
-            assert len(outputs) > 1
-            # Each dataloader has its own individual metrics suffixed with its index,
-            # and we also aggregate (average) metrics across dataloaders
+    def eval_epoch_end(self, outputs: list[dict[str, Any]], mode: str):
+        assert isinstance(outputs, list)
+        assert mode in {"dev", "test"}
+
+        # We gather individual metrics from each dataloader and compute the average if there is
+        # more than one
+        more_than_1 = len(outputs) > 1
+        if more_than_1:
             sums = defaultdict(int)
-            for i, one_split_outputs in enumerate(outputs):
-                metrics = self.get_metrics(reset=True)
-                for k, v in metrics.items():
-                    logs[k + str(i + 1)] = v
+        for i in range(len(outputs)):
+            split = (self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits)[i]
+            assert split != "avg"  # reserved keyword for below
+            metrics = self.get_metrics(split, reset=True)
+            for k, v in metrics.items():
+                if more_than_1:
+                    self.log(f"{k}_{split}", v)
                     sums[k] += v
-            logs.update({k: v / len(outputs) for k, v in sums.items()})
-        else:
-            logs.update(self.get_metrics(reset=True))
+                else:
+                    self.log(k, v)
+        if more_than_1:
+            for k, v in sums.items():
+                self.log(f"{k}_avg", v / len(outputs))
 
-        for k, v in logs.items():
-            self.log(k, v)
-
-    def get_metrics(self, reset=False) -> dict[str, Any]:
-        metrics = {name: metric.get_metric() for name, metric in self.metrics.items()}
+    def get_metrics(self, split: str, reset=False) -> dict[str, Any]:
+        metrics = {name: metric.get_metric() for name, metric in self.metrics[split].items()}
         if reset:
-            for metric in self.metrics.values():
+            for metric in self.metrics[split].values():
                 metric.reset()
         return metrics
 
-    def test_step(self, batch, batch_idx: int):
-        return self.validation_step(batch, batch_idx)
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        return self.eval_step(batch, batch_idx, "dev", dataloader_idx=dataloader_idx)
+
+    def validation_epoch_end(self, outputs):
+        return self.eval_epoch_end(outputs, "dev")
+
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        return self.eval_step(batch, batch_idx, "test", dataloader_idx=dataloader_idx)
 
     def test_epoch_end(self, outputs):
-        return self.validation_epoch_end(outputs)
+        return self.eval_epoch_end(outputs, "test")
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
