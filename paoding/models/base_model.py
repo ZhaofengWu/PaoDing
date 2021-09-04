@@ -131,7 +131,7 @@ class BaseModel(pl.LightningModule):
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
 
-    def step(self, batch) -> dict[str, Any]:
+    def forward(self, batch) -> dict[str, Any]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     def compute_loss(self, logits, labels):
@@ -145,12 +145,12 @@ class BaseModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx) -> dict[str, Any]:
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
-        return {"loss": self.compute_loss(self._step(batch)["logits"], batch["labels"])}
+        return {"loss": self.compute_loss(self(batch)["logits"], batch["labels"])}
 
     def eval_step(self, batch, batch_idx, mode: str, dataloader_idx=0):
         assert mode in {"dev", "test"}
 
-        logits = self._step(batch)["logits"]
+        logits = self(batch)["logits"]
         labels = batch["labels"]
         assert logits.dim() == 2 and labels.dim() == 1
 
