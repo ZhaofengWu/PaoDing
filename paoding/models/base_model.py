@@ -25,18 +25,6 @@ class BaseModel(pl.LightningModule):
         self.prepare_data()
         self.metrics = self.setup_metrics()
 
-    @property
-    def pad_token_id(self):
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    @property
-    def pad_token_type_id(self):
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    @property
-    def padding_side(self):
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
     def prepare_data(self):
         self.dataset = Dataset(self.hparams)
 
@@ -52,9 +40,9 @@ class BaseModel(pl.LightningModule):
             sampler=sampler,
             collate_fn=lambda batch: collate_fn(
                 batch,
-                self.pad_token_id,
-                self.pad_token_type_id,
-                self.padding_side,
+                self.dataset.tokenizer.pad_token_id,
+                self.dataset.tokenizer.pad_token_type_id,
+                self.dataset.tokenizer.padding_side,
                 self.dataset.output_mode,
             ),
         )
