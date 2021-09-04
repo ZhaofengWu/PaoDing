@@ -29,22 +29,17 @@ TASKS = {
 
 
 class Transformer(torch.nn.module):
-    def __init__(self, hparams, trainable=True, **config_kwargs):
+    def __init__(self, hparams, task, trainable=True, **config_kwargs):
         super().__init__()
 
-        self.config = AutoConfig.from_pretrained(
-            hparams.model_name_or_path,
-            **(
-                {"num_labels": self.dataset.num_labels}
-                if self.dataset.num_labels is not None
-                else {}
-            ),
-            **config_kwargs,
-        )
-        self.model = TASKS[hparams.task].from_pretrained(
-            hparams.model_name_or_path, config=self.config
-        )
+        config_args = dict(config_kwargs)
+        if task == "base":  # TODO: this might break models that don't support this flag
+            config_args["add_pooling_layer"] = False
+        self.config = AutoConfig.from_pretrained(hparams.model_name_or_path, **config_args)
+        self.model = TASKS[task].from_pretrained(hparams.model_name_or_path, config=self.config)
 
+        if not trainable:  # TODO: support this
+            assert task == "base", "No support for freezing the backbone for headed tasks yet"
         self.trainable = trainable
 
     def forward(self, *args, **kwargs):
@@ -55,14 +50,6 @@ class Transformer(torch.nn.module):
 
     @staticmethod
     def add_args(parser):
-        parser.add_argument(
-            "--task",
-            default=None,
-            type=str,
-            required=True,
-            choices=TASKS.keys(),
-            help="The task of the model.",
-        )
         parser.add_argument(
             "--model_name_or_path",
             default=None,
