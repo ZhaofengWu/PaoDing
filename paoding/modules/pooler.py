@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 import torch
@@ -8,7 +9,7 @@ POOLING_MODES = {"avg", "max"}
 
 
 class Pooler(torch.nn.Module):
-    def __init__(self, hparams):
+    def __init__(self, hparams: argparse.Namespace):
         assert hparams.pooling_mode in POOLING_MODES
 
         super().__init__()
@@ -30,7 +31,7 @@ class Pooler(torch.nn.Module):
             raise KeyError("Unsupported pooling mode")
 
     @staticmethod
-    def add_args(parser):
+    def add_args(parser: argparse.ArgumentParser):
         parser.add_argument(
             "--pooling_mode",
             default=None,

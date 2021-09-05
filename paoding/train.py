@@ -4,6 +4,7 @@ import logging
 import os
 import json
 from pathlib import Path
+from typing import Type
 
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
@@ -71,7 +72,9 @@ def add_generic_args(parser: argparse.ArgumentParser):
     parser.add_argument("--seed", type=int, default=42)
 
 
-def train(model_class: BaseModel, dataset_class: Dataset, args=None, extra_dump_args=None):
+def train(
+    model_class: Type[BaseModel], dataset_class: Type[Dataset], args=None, extra_dump_args=None
+):
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
     model_class.add_args(parser)

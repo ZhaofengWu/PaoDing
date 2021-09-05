@@ -3,7 +3,7 @@ import hashlib
 import os
 import pickle
 
-from datasets import DatasetDict
+from datasets import DatasetDict, Dataset as HFDataset
 from transformers import PreTrainedTokenizerBase
 
 
@@ -25,7 +25,7 @@ class Dataset:
         self.dataset_dict = self.preprocess(self.dataset_dict)
         pickle.dump(self.dataset_dict, open(self.cache_path, "wb"))
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> HFDataset:
         return self.dataset_dict[key]
 
     @property

@@ -1,22 +1,22 @@
 import torch
 
 
-def merge_first_dims(tensor, n=2):
+def merge_first_dims(tensor: torch.Tensor, n=2):
     return tensor.reshape(-1, *tensor.shape[n:])
 
 
-def split_first_dim(tensor, dims):
+def split_first_dim(tensor: torch.Tensor, dims: list[int]):
     return tensor.reshape(*dims, *tensor.shape[1:])
 
 
-def lens_to_mask(lens, max_len=None):
+def lens_to_mask(lens: torch.Tensor, max_len: int = None):
     assert lens.dim() == 1
     if max_len is None:
         max_len = lens.max()
     return torch.arange(max_len, device=lens.device).expand(len(lens), -1) < lens.unsqueeze(1)
 
 
-def padded_nonzero(tensor):
+def padded_nonzero(tensor: torch.Tensor):
     """
     padded_nonzero(
         [

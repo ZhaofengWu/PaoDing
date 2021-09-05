@@ -1,7 +1,7 @@
 """Adapted from https://github.com/huggingface/transformers/blob/v4.0.0/examples/seq2seq/utils.py"""
 
 import math
-from typing import Iterable, List
+from typing import Iterable
 
 import numpy as np
 import torch
@@ -10,7 +10,9 @@ from torch.utils.data import Sampler
 from transformers.file_utils import cached_property
 
 
-def make_sortish_sampler(lens, batch_size, distributed=False, perturb=True) -> Sampler:
+def make_sortish_sampler(
+    lens: list[int], batch_size: int, distributed=False, perturb=True
+) -> Sampler:
     if distributed:
         return DistributedSortishSampler(lens, batch_size, perturb=perturb)
     else:
@@ -20,17 +22,17 @@ def make_sortish_sampler(lens, batch_size, distributed=False, perturb=True) -> S
 class SortishSampler(Sampler):
     "Go through the text data by order of src length with a bit of randomness."
 
-    def __init__(self, lens, batch_size, perturb=True):
+    def __init__(self, lens: list[int], batch_size: int, perturb=True):
         self.lens, self.bs, self.perturb = lens, batch_size, perturb
 
     def __len__(self) -> int:
         return len(self.lens)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable:
         return iter(sortish_sampler_indices(self.lens, self.bs, perturb=self.perturb))
 
 
-def sortish_sampler_indices(lens: List, bs: int, perturb=True) -> np.array:
+def sortish_sampler_indices(lens: list[int], bs: int, perturb=True) -> np.array:
     "Go through the text lens by order of src length with a bit of randomness."
     if not perturb:
         return np.argsort(np.array(lens) * -1).tolist()
@@ -59,7 +61,13 @@ class DistributedSortishSampler(Sampler):
     """Copied from torch DistributedSampler"""
 
     def __init__(
-        self, lens, batch_size, num_replicas=None, rank=None, add_extra_examples=True, perturb=True
+        self,
+        lens: list[int],
+        batch_size: int,
+        num_replicas=None,
+        rank=None,
+        add_extra_examples=True,
+        perturb=True,
     ):
         if num_replicas is None:
             if not dist.is_available():
@@ -105,8 +113,8 @@ class DistributedSortishSampler(Sampler):
         available_indices = indices[self.rank : self.total_size : self.num_replicas]
         return available_indices
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_samples
 
-    def set_epoch(self, epoch):
+    def set_epoch(self, epoch: int):
         self.epoch = epoch

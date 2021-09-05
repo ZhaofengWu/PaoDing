@@ -1,10 +1,10 @@
 import argparse
 from collections import defaultdict
-from typing import Any, Optional, Union
+from typing import Any
 
 from allennlp.training.metrics import Metric
 import pytorch_lightning as pl
-from pytorch_lightning.utilities.apply_func import apply_to_collection
+import torch
 import torch.nn.functional as F
 from torch.optim import Optimizer
 from torch.utils.data.dataloader import DataLoader
@@ -48,7 +48,7 @@ class BaseModel(pl.LightningModule):
         )
         return dataloader
 
-    def setup(self, stage: Optional[str] = None) -> None:
+    def setup(self, stage: str = None):
         """To set up self.dataset_size"""
         if stage != "fit":
             return
@@ -119,10 +119,10 @@ class BaseModel(pl.LightningModule):
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
 
-    def forward(self, batch) -> dict[str, Any]:
+    def forward(self, batch: dict[str, torch.Tensor]) -> dict[str, Any]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
-    def compute_loss(self, logits, labels):
+    def compute_loss(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         if self.dataset.output_mode == "classification":
             loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))
         elif self.dataset.output_mode == "regression":
@@ -131,11 +131,13 @@ class BaseModel(pl.LightningModule):
             raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
         return loss
 
-    def training_step(self, batch, batch_idx) -> dict[str, Any]:
+    def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, Any]:
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
         return {"loss": self.compute_loss(self(batch)["logits"], batch["labels"])}
 
-    def eval_step(self, batch, batch_idx, mode: str, dataloader_idx=0):
+    def eval_step(
+        self, batch: dict[str, torch.Tensor], batch_idx: int, mode: str, dataloader_idx=0
+    ) -> dict[str, Any]:
         assert mode in {"dev", "test"}
 
         logits = self(batch)["logits"]
@@ -149,7 +151,7 @@ class BaseModel(pl.LightningModule):
         else:
             raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
 
-        splits = (self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits)
+        splits = self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits
         split = splits[dataloader_idx]
         for metric in self.metrics[split].values():
             metric(*metric.detach_tensors(preds, labels))
@@ -186,16 +188,20 @@ class BaseModel(pl.LightningModule):
                 metric.reset()
         return metrics
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+    def validation_step(
+        self, batch: dict[str, torch.Tensor], batch_idx: int, dataloader_idx=0
+    ) -> dict[str, Any]:
         return self.eval_step(batch, batch_idx, "dev", dataloader_idx=dataloader_idx)
 
-    def validation_epoch_end(self, outputs):
+    def validation_epoch_end(self, outputs: list[dict[str, Any]]):
         return self.eval_epoch_end(outputs, "dev")
 
-    def test_step(self, batch, batch_idx, dataloader_idx=0):
+    def test_step(
+        self, batch: dict[str, torch.Tensor], batch_idx: int, dataloader_idx=0
+    ) -> dict[str, Any]:
         return self.eval_step(batch, batch_idx, "test", dataloader_idx=dataloader_idx)
 
-    def test_epoch_end(self, outputs):
+    def test_epoch_end(self, outputs: list[dict[str, Any]]):
         return self.eval_epoch_end(outputs, "test")
 
     @staticmethod

@@ -12,7 +12,7 @@ class LocalDataset(Dataset):
         # e.g. ["csv"], {"delimiter": "=", "column_names": ["text", "label"]}
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
-    def split_filename(self, split) -> str:
+    def split_filename(self, split: str) -> str:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     def load(self) -> DatasetDict:

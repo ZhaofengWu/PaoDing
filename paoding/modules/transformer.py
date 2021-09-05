@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 import torch
@@ -29,7 +30,7 @@ TASKS = {
 
 
 class Transformer(torch.nn.module):
-    def __init__(self, hparams, task, trainable=True, **config_kwargs):
+    def __init__(self, hparams: argparse.Namespace, task: str, trainable=True, **config_kwargs):
         super().__init__()
 
         config_args = dict(config_kwargs)
@@ -49,7 +50,7 @@ class Transformer(torch.nn.module):
             return self.model(*args, **kwargs)
 
     @staticmethod
-    def add_args(parser):
+    def add_args(parser: argparse.ArgumentParser):
         parser.add_argument(
             "--model_name_or_path",
             default=None,

@@ -1,10 +1,13 @@
 from collections import defaultdict
+from typing import Iterable, Union
 
 import torch
 from torch.utils.data._utils.collate import default_collate
 
+T = Union[int, float, bool]
 
-def _find_max_lens(batch, allow_keys):
+
+def _find_max_lens(batch: list[dict[str, list[T]]], allow_keys: Iterable[str]) -> int:
     max_lens = defaultdict(int)
     for e in batch:
         for k, v in e.items():
@@ -13,7 +16,7 @@ def _find_max_lens(batch, allow_keys):
     return max_lens
 
 
-def _pad(sequence, padding_token, padding_length, padding_side):
+def _pad(sequence: list[T], padding_token: T, padding_length: int, padding_side: str) -> list[T]:
     assert padding_side in {"left", "right"}
     if sequence is None:
         return None
@@ -23,7 +26,7 @@ def _pad(sequence, padding_token, padding_length, padding_side):
         return sequence + [padding_token] * padding_length
 
 
-def _tensorize(sequence, name, output_mode):
+def _tensorize(sequence: list[T], name: str, output_mode: str) -> torch.Tensor:
     dtype = torch.long
     if name == "labels" and output_mode == "regression":
         dtype = torch.float
@@ -32,7 +35,13 @@ def _tensorize(sequence, name, output_mode):
     return torch.tensor(sequence, dtype=dtype)
 
 
-def collate_fn(batch, pad_token_id, pad_token_type_id, padding_side, output_mode):
+def collate_fn(
+    batch: list[dict[str, list[T]]],
+    pad_token_id: int,
+    pad_token_type_id: int,
+    padding_side: str,
+    output_mode: str,
+) -> dict[str, torch.Tensor]:
     pad_token_map = {
         "input_ids": pad_token_id,
         "attention_mask": False,
