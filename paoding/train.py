@@ -28,7 +28,7 @@ class LoggingCallback(pl.Callback):
         logger.info("")
         logger.info("***** Validation results *****")
 
-        assert pl_module.metric_watch_mode in {"max", "min"}
+        assert pl_module.dataset.metric_watch_mode in {"max", "min"}
 
         metrics = trainer.callback_metrics
         # Log results
@@ -36,14 +36,16 @@ class LoggingCallback(pl.Callback):
             if key not in ["log", "progress_bar"]:
                 logger.info("{} = {}".format(key, str(metrics[key])))
 
-            if key == pl_module.metric_to_watch and not trainer.running_sanity_check:
+            if key == pl_module.dataset.metric_to_watch and not trainer.running_sanity_check:
                 if (
                     self.best_dev_metric is None
                     or (
-                        pl_module.metric_watch_mode == "max" and metrics[key] > self.best_dev_metric
+                        pl_module.dataset.metric_watch_mode == "max"
+                        and metrics[key] > self.best_dev_metric
                     )
                     or (
-                        pl_module.metric_watch_mode == "min" and metrics[key] < self.best_dev_metric
+                        pl_module.dataset.metric_watch_mode == "min"
+                        and metrics[key] < self.best_dev_metric
                     )
                 ):
                     self.best_epoch = trainer.current_epoch
@@ -115,9 +117,9 @@ def train(model_class: BaseModel, dataset_class: Dataset, args=None, extra_dump_
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=output_dir,
-        filename=f"{{epoch}}_{{{model.metric_to_watch}:.4f}}",
-        monitor=model.metric_to_watch,
-        mode=model.metric_watch_mode,
+        filename=f"{{epoch}}_{{{model.dataset.metric_to_watch}:.4f}}",
+        monitor=model.dataset.metric_to_watch,
+        mode=model.dataset.metric_watch_mode,
         save_top_k=1,
         save_last=True,
     )
