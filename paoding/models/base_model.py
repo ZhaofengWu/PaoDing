@@ -38,6 +38,7 @@ class BaseModel(pl.LightningModule):
             dataset_split,
             batch_size=batch_size,
             sampler=sampler,
+            num_workers=4,
             collate_fn=lambda batch: collate_fn(
                 batch,
                 self.dataset.tokenizer.pad_token_id,
@@ -45,6 +46,7 @@ class BaseModel(pl.LightningModule):
                 self.dataset.tokenizer.padding_side,
                 self.dataset.output_mode,
             ),
+            pin_memory=True,
         )
         return dataloader
 
@@ -118,6 +120,12 @@ class BaseModel(pl.LightningModule):
             optimizer, num_warmup_steps=self.hparams.warmup_steps, num_training_steps=total_steps
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
+
+    def optimizer_zero_grad(
+        self, epoch: int, batch_idx: int, optimizer: Optimizer, optimizer_idx: int
+    ):
+        """See https://pytorch.org/docs/stable/generated/torch.optim.Optimizer.zero_grad.html"""
+        optimizer.zero_grad(set_to_none=True)
 
     def forward(self, batch: dict[str, torch.Tensor]) -> dict[str, Any]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
