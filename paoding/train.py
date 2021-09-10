@@ -63,6 +63,25 @@ class LoggingCallback(pl.Callback):
                 logger.info(f"best_{key} = {value}")
 
 
+def parse_meta_args(add_args_fn):
+    """
+    A meta parser that can be used to decide the model and dataset classes.
+    Typical usage:
+
+    ```
+    meta_args, extra_args = parse_meta_args(add_meta_args)
+    train(
+        MODEL_MAP[meta_args.model_type],
+        DATASET_MAP[meta_args.data_type],
+        args=extra_args,
+        extra_dump_args=meta_args,
+    )
+    """
+    parser = argparse.ArgumentParser()
+    add_args_fn(parser)
+    return parser.parse_known_args()
+
+
 def add_generic_args(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--output_dir", default=None, type=str, required=True, dest="default_root_dir"
