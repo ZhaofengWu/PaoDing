@@ -1,5 +1,6 @@
 import argparse
 import os
+from typing import Callable
 
 from datasets import DatasetDict, load_dataset
 
@@ -7,23 +8,26 @@ from paoding.data.dataset import Dataset
 
 
 class LocalDataset(Dataset):
-    @property
-    def load_dataset_args(self) -> tuple[list, dict]:
-        # e.g. ["csv"], {"delimiter": "=", "column_names": ["text", "label"]}
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    def split_filename(self, split: str) -> str:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+    def __init__(
+        self,
+        hparams: argparse.Namespace,
+        split_filename: Callable[[str], str],
+        *load_args,
+        **load_kwargs,
+    ):
+        self.split_filename = split_filename
+        self.load_args = load_args
+        self.load_kwargs = load_kwargs
+        super().__init__(hparams)
 
     def load(self) -> DatasetDict:
-        args, kwargs = self.load_dataset_args
         dataset_dict = load_dataset(
-            *args,
+            *self.load_args,
             data_files={
-                split: os.path.join(self.hparams, self.split_filename(split))
-                for split in ["train", "dev", "test"]
+                split: os.path.join(self.hparams.data_dir, self.split_filename(split))
+                for split in [self.train_split] + self.dev_splits + self.test_splits
             },
-            **kwargs,
+            **self.load_kwargs,
         )
         assert isinstance(dataset_dict, DatasetDict)
         return dataset_dict

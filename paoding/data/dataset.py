@@ -1,7 +1,9 @@
 import argparse
+from collections.abc import ItemsView
 import hashlib
 import os
 import pickle
+from typing import Any
 
 from datasets import DatasetDict, Dataset as HFDataset
 from transformers import PreTrainedTokenizerBase
@@ -29,12 +31,21 @@ class Dataset:
         return self.dataset_dict[key]
 
     @property
+    def hash_fields(self) -> list[Any]:
+        """For cache purpose"""
+        return [self.tokenizer.__repr__]
+
+    @property
     def cache_path(self) -> str:
         hash = lambda s: hashlib.md5(s.encode("utf-8")).hexdigest()
+        hash_fields = "".join([str(f) for f in self.hash_fields])
         return os.path.join(
-            self.hparams.output_dir,
-            f"{self.__class__.__name__}_{hash(self.tokenizer.__repr__)}.datacache",
+            self.hparams.output_dir, f"{self.__class__.__name__}_{hash(hash_fields)}.datacache"
         )
+
+    @property
+    def train_split(self) -> str:
+        return "train"
 
     @property
     def dev_splits(self) -> list[str]:
@@ -50,9 +61,14 @@ class Dataset:
         return "text"
 
     @property
-    def text_pair_key(self) -> str:
+    def second_text_key(self) -> str:
         """For text pairs, the key in the example dictionary for the second text."""
         return None
+
+    @property
+    def label_key(self) -> str:
+        """For text pairs, the key in the example dictionary for the second text."""
+        return "label"
 
     @property
     def sort_key(self) -> str:
@@ -86,7 +102,7 @@ class Dataset:
     def preprocess(self, dataset_dict: DatasetDict) -> DatasetDict:
         tokenization_fn = lambda examples: self.tokenizer(
             examples[self.text_key],
-            text_pair=examples[self.text_pair_key] if self.text_pair_key is not None else None,
+            text_pair=examples[self.second_text_key] if self.second_text_key is not None else None,
             padding=False,  # we control this in the collator
             truncation=True,
             max_length=self.tokenizer.model_max_len,
@@ -102,6 +118,9 @@ class Dataset:
 
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    def items(self) -> ItemsView:
+        return self.dataset_dict.items()
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
