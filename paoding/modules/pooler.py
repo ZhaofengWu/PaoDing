@@ -5,7 +5,7 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-POOLING_MODES = {"avg", "max"}
+POOLING_MODES = {"avg", "max", "last"}
 
 
 class Pooler(torch.nn.Module):
@@ -27,6 +27,8 @@ class Pooler(torch.nn.Module):
             return tensor.mean(1)
         elif self.hparams.pooling_mode == "max":
             return tensor.max(1)
+        elif self.hparams.pooling_mode == "last":
+            return tensor[:, -1, :]
         else:
             raise KeyError("Unsupported pooling mode")
 
