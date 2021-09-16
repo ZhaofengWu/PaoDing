@@ -12,7 +12,7 @@ from pytorch_lightning.utilities import rank_zero_only
 reload(logging)
 
 from paoding.data.dataset import Dataset
-from paoding.models.base_model import BaseModel
+from paoding.models.model import Model
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class LoggingCallback(pl.Callback):
         self.best_dev_metrics = None
 
     @rank_zero_only
-    def on_validation_end(self, trainer: pl.Trainer, pl_module: BaseModel):
+    def on_validation_end(self, trainer: pl.Trainer, pl_module: Model):
         logger.info("")
         logger.info("***** Validation results *****")
 
@@ -91,9 +91,7 @@ def add_generic_args(parser: argparse.ArgumentParser):
     parser.add_argument("--seed", type=int, default=42)
 
 
-def train(
-    model_class: Type[BaseModel], dataset_class: Type[Dataset], args=None, extra_dump_args=None
-):
+def train(model_class: Type[Model], dataset_class: Type[Dataset], args=None, extra_dump_args=None):
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
     model_class.add_args(parser)

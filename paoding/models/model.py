@@ -16,7 +16,7 @@ from paoding.data.dataset import Dataset
 from paoding.data.sortish_sampler import make_sortish_sampler
 
 
-class BaseModel(pl.LightningModule):
+class Model(pl.LightningModule):
     def __init__(self, hparams: argparse.Namespace):
         super().__init__()
         self.save_hyperparameters()
