@@ -31,12 +31,16 @@ class Model(pl.LightningModule):
     def _get_dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset[split]
         lens = [len(ids) for ids in dataset_split[self.dataset.sort_key]]
-        sampler = make_sortish_sampler(
-            lens, batch_size, distributed=self.hparams.gpus > 1, perturb=shuffle
-        )
+        if shuffle:
+            sampler = make_sortish_sampler(
+                lens, batch_size, distributed=self.hparams.gpus > 1, perturb=True
+            )
+        else:
+            sampler = None
         dataloader = DataLoader(
             dataset_split,
             batch_size=batch_size,
+            shuffle=shuffle,
             sampler=sampler,
             num_workers=4,
             collate_fn=lambda batch: collate_fn(
