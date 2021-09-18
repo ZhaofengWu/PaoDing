@@ -60,7 +60,7 @@ class Model(pl.LightningModule):
         )
         self.dataset_size = len(self._train_dataloader.dataset)
 
-    def setup_metrics(self) -> dict[str, Metric]:
+    def setup_metrics(self) -> dict[str, dict[str, Metric]]:
         return {
             split: {name: Metric.by_name(name) for name in self.dataset.metric_names}
             for split in self.dataset.dev_splits + self.dataset.test_splits
