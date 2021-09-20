@@ -37,7 +37,7 @@ class LoggingCallback(pl.Callback):
             if key not in ["log", "progress_bar"]:
                 logger.info("{} = {}".format(key, str(metrics[key])))
 
-            if key == pl_module.dataset.metric_to_watch and not trainer.running_sanity_check:
+            if key == pl_module.dataset.metric_to_watch and not trainer.sanity_checking:
                 if (
                     self.best_dev_metric is None
                     or (
@@ -57,7 +57,7 @@ class LoggingCallback(pl.Callback):
                         if k not in {"log", "progress_bar", "loss", "val_loss", "lr", "epoch"}
                     }
 
-        if not trainer.running_sanity_check:
+        if not trainer.sanity_checking:
             logger.info(f"best_epoch = {self.best_epoch}")
             for key, value in sorted(self.best_dev_metrics.items()):
                 logger.info(f"best_{key} = {value}")
@@ -74,7 +74,6 @@ def parse_meta_args(add_args_fn):
         MODEL_MAP[meta_args.model_type],
         DATASET_MAP[meta_args.data_type],
         args=extra_args,
-        extra_dump_args=meta_args,
     )
     """
     parser = argparse.ArgumentParser()
@@ -83,32 +82,35 @@ def parse_meta_args(add_args_fn):
 
 
 def add_generic_args(parser: argparse.ArgumentParser):
-    parser.add_argument(
-        "--output_dir", default=None, type=str, required=True, dest="default_root_dir"
-    )
+    parser.add_argument("--output_dir", default=None, type=str, required=True)
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--gpus", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
 
 
-def train(model_class: Type[Model], dataset_class: Type[Dataset], args=None, extra_dump_args=None):
+def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse.Namespace = None):
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
     model_class.add_args(parser)
     dataset_class.add_args(parser)
     args = parser.parse_args(args=args)
 
-    output_dir = args.default_root_dir
+    output_dir = args.output_dir
     if os.path.exists(output_dir):
         content = os.listdir(output_dir)
         # For DDP, when subprocesses are launched, there'll be a log.txt inside the folder already
         if len(content) > 0 and content != ["log.txt"]:
-            raise ValueError("Output directory ({output_dir}) already exists and is not empty.")
+            raise ValueError(f"Output directory ({output_dir}) already exists and is not empty.")
     else:
         os.mkdir(output_dir)
 
+    assert (
+        getattr(args, "model_class", None) is None and getattr(args, "dataset_class", None) is None
+    )
+    args.model_class = model_class
+    args.dataset_class = dataset_class
     json.dump(
-        (vars(args) | vars(extra_dump_args)) if extra_dump_args is not None else vars(args),
+        {k: str(v) if k in ("model_class", "dataset_class") else v for k, v in vars(args).items()},
         open(os.path.join(output_dir, "args.json"), "w"),
     )
 
@@ -144,15 +146,16 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args=None, ext
         save_last=True,
     )
 
-    train_params = vars(args) | dict(
-        checkpoint_callback=checkpoint_callback,
-        callbacks=[LoggingCallback()],
+    trainer = pl.Trainer(
+        default_root_dir=args.output_dir,
+        gradient_clip_val=args.gradient_clip_val,
+        gpus=args.gpus,
+        accumulate_grad_batches=args.accumulate_grad_batches,
+        max_epochs=args.epochs,
+        precision=16 if args.fp16 else 32,
+        callbacks=[LoggingCallback(), checkpoint_callback],
         replace_sampler_ddp=False,
     )
-    if args.fp16:
-        train_params["precision"] = 16
-
-    trainer = pl.Trainer(**train_params)
     trainer.fit(model)
 
     if local_rank <= 0:

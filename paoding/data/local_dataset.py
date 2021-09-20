@@ -31,8 +31,3 @@ class LocalDataset(Dataset):
         )
         assert isinstance(dataset_dict, DatasetDict)
         return dataset_dict
-
-    @staticmethod
-    def add_args(parser: argparse.ArgumentParser):
-        Dataset.add_args(parser)
-        parser.add_argument("--data_dir", required=True, type=str)

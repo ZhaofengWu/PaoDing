@@ -10,7 +10,7 @@ from transformers import (
     AutoModelForSeq2SeqLM,
     AutoModelForSequenceClassification,
     AutoModelForTokenClassification,
-    AutoModelWithLMHead,
+    AutoModelForCausalLM,
 )
 
 
@@ -23,13 +23,13 @@ TASKS = {
     "question-answering": AutoModelForQuestionAnswering,
     "pretraining": AutoModelForPreTraining,
     "token-classification": AutoModelForTokenClassification,
-    "language-modeling": AutoModelWithLMHead,
+    "causal-lm": AutoModelForCausalLM,
     "summarization": AutoModelForSeq2SeqLM,
     "translation": AutoModelForSeq2SeqLM,
 }
 
 
-class Transformer(torch.nn.module):
+class Transformer(torch.nn.Module):
     def __init__(self, hparams: argparse.Namespace, task: str, trainable=True, **config_kwargs):
         super().__init__()
 

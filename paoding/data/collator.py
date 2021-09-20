@@ -1,32 +1,42 @@
-from collections import defaultdict
 from typing import Iterable, Union
 
+import numpy as np
 import torch
 from torch.utils.data._utils.collate import default_collate
 
-T = Union[int, float, bool]
+PAD_TYPE = Union[int, float, bool]
 
 
-def _find_max_lens(batch: list[dict[str, list[T]]], allow_keys: Iterable[str]) -> int:
-    max_lens = defaultdict(int)
+def _find_max_shapes(
+    batch: list[dict[str, np.ndarray]], allow_keys: Iterable[str]
+) -> dict[str, np.ndarray]:
+    max_shapes = {}
     for e in batch:
         for k, v in e.items():
-            if k in allow_keys:
-                max_lens[k] = max(max_lens[k], len(v))
-    return max_lens
+            if k not in allow_keys:
+                continue
+            shape = np.array(v.shape)
+            if k not in max_shapes:
+                max_shapes[k] = shape
+            else:
+                try:
+                    max_shapes[k] = np.maximum(max_shapes[k], shape)
+                except ValueError:  # more informed error message
+                    raise ValueError(f"Different shapes for {k}: {max_shapes[k]} vs. {shape}")
+    return max_shapes
 
 
-def _pad(sequence: list[T], padding_token: T, padding_length: int, padding_side: str) -> list[T]:
+def _pad(
+    sequence: np.ndarray, padding_token: PAD_TYPE, padding_shape: np.ndarray, padding_side: str
+) -> np.ndarray:
     assert padding_side in {"left", "right"}
     if sequence is None:
         return None
-    if padding_side == "left":
-        return [padding_token] * padding_length + sequence
-    else:
-        return sequence + [padding_token] * padding_length
+    padding = [(p, 0) if padding_side == "left" else (0, p) for p in padding_shape]
+    return np.pad(sequence, padding, constant_values=padding_token)
 
 
-def _tensorize(sequence: list[T], name: str, output_mode: str) -> torch.Tensor:
+def _tensorize(sequence: np.ndarray, name: str, output_mode: str) -> torch.Tensor:
     dtype = torch.long
     if name == "labels" and output_mode == "regression":
         dtype = torch.float
@@ -36,21 +46,21 @@ def _tensorize(sequence: list[T], name: str, output_mode: str) -> torch.Tensor:
 
 
 def collate_fn(
-    batch: list[dict[str, list[T]]],
-    pad_token_id: int,
-    pad_token_type_id: int,
+    batch: list[dict[str, list]],
+    pad_token_map: dict[str, PAD_TYPE],
     padding_side: str,
     output_mode: str,
 ) -> dict[str, torch.Tensor]:
-    pad_token_map = {
-        "input_ids": pad_token_id,
-        "attention_mask": False,
-        "token_type_ids": pad_token_type_id,
-    }
-    max_lens = _find_max_lens(batch, pad_token_map.keys())
+    """
+    Input:
+        pad_token_map: specifies the padding for each key. Only keys including in this map, plus
+            "labels", will be included in the batch.
+    """
+    batch = [{k: np.array(v) for k, v in e.items()} for e in batch]
+    max_shapes = _find_max_shapes(batch, pad_token_map.keys())
     for i, e in enumerate(batch):
         batch[i] = {"labels": e["labels"]} | {
-            k: _pad(e[k], pad_token, max_lens[k] - len(e[k]), padding_side)
+            k: _pad(e[k], pad_token, max_shapes[k] - np.array(e[k].shape), padding_side)
             for k, pad_token in pad_token_map.items()
         }
         batch[i] = {k: _tensorize(v, k, output_mode) for k, v in batch[i].items()}

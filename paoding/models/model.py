@@ -11,62 +11,32 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import get_linear_schedule_with_warmup
 from transformers import AdamW
 
-from paoding.data.collator import collate_fn
-from paoding.data.dataset import Dataset
-from paoding.data.sortish_sampler import make_sortish_sampler
-
 
 class Model(pl.LightningModule):
     def __init__(self, hparams: argparse.Namespace):
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(hparams)
         # pytorch-lightning calls this, but we call it ourselves here in case the __init__ of
         # children modules need dataset attributes, e.g., num_labels
         self.prepare_data()
         self.metrics = self.setup_metrics()
 
     def prepare_data(self):
-        self.dataset = Dataset(self.hparams)
-
-    def _get_dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
-        dataset_split = self.dataset[split]
-        lens = [len(ids) for ids in dataset_split[self.dataset.sort_key]]
-        if shuffle:
-            sampler = make_sortish_sampler(
-                lens, batch_size, distributed=self.hparams.gpus > 1, perturb=True
-            )
-        else:
-            sampler = None
-        dataloader = DataLoader(
-            dataset_split,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            sampler=sampler,
-            num_workers=4,
-            collate_fn=lambda batch: collate_fn(
-                batch,
-                self.dataset.tokenizer.pad_token_id,
-                self.dataset.tokenizer.pad_token_type_id,
-                self.dataset.tokenizer.padding_side,
-                self.dataset.output_mode,
-            ),
-            pin_memory=True,
-        )
-        return dataloader
+        self.dataset = self.hparams.dataset_class(self.hparams)
 
     def setup(self, stage: str = None):
         """To set up self.dataset_size"""
         if stage != "fit":
             return
 
-        self._train_dataloader = self._get_dataloader(
+        self._train_dataloader = self.dataset.dataloader(
             "train", self.hparams.batch_size, shuffle=True
         )
         self.dataset_size = len(self._train_dataloader.dataset)
 
     def setup_metrics(self) -> dict[str, dict[str, Metric]]:
         return {
-            split: {name: Metric.by_name(name) for name in self.dataset.metric_names}
+            split: {name: Metric.by_name(name)() for name in self.dataset.metric_names}
             for split in self.dataset.dev_splits + self.dataset.test_splits
         }
 
@@ -75,13 +45,13 @@ class Model(pl.LightningModule):
 
     def val_dataloader(self, shuffle=False) -> list[DataLoader]:
         return [
-            self._get_dataloader(split, self.hparams.eval_batch_size, shuffle=shuffle)
+            self.dataset.dataloader(split, self.hparams.eval_batch_size, shuffle=shuffle)
             for split in self.dataset.dev_splits
         ]
 
     def test_dataloader(self, shuffle=False) -> list[DataLoader]:
         return [
-            self._get_dataloader(split, self.hparams.eval_batch_size, shuffle=shuffle)
+            self.dataset.dataloader(split, self.hparams.eval_batch_size, shuffle=shuffle)
             for split in self.dataset.test_splits
         ]
 
@@ -89,7 +59,6 @@ class Model(pl.LightningModule):
         "Prepare optimizer and schedule (linear warmup and decay)"
 
         no_decay = ["bias", "LayerNorm.weight", "layernorm.weight", "layer_norm.weight"]
-        assert self.named_parameters == self.model.named_parameters()
         optimizer_grouped_parameters = [
             {
                 "params": [
@@ -106,7 +75,7 @@ class Model(pl.LightningModule):
         ]
         optimizer = AdamW(
             optimizer_grouped_parameters,
-            lr=self.hparams.learning_rate,
+            lr=self.hparams.lr,
             eps=self.hparams.adam_epsilon,
         )
         scheduler = self.get_lr_scheduler(optimizer)
@@ -116,7 +85,7 @@ class Model(pl.LightningModule):
     def get_lr_scheduler(self, optimizer: Optimizer) -> dict:
         num_devices = max(1, self.hparams.gpus)  # TODO: consider num_tpu_cores
         effective_batch_size = (
-            self.hparams.train_batch_size * self.hparams.accumulate_grad_batches * num_devices
+            self.hparams.batch_size * self.hparams.accumulate_grad_batches * num_devices
         )
         total_steps = (self.dataset_size / effective_batch_size) * self.hparams.epochs
 
@@ -131,12 +100,22 @@ class Model(pl.LightningModule):
         """See https://pytorch.org/docs/stable/generated/torch.optim.Optimizer.zero_grad.html"""
         optimizer.zero_grad(set_to_none=True)
 
-    def forward(self, batch: dict[str, torch.Tensor]) -> dict[str, Any]:
+    def forward(self, batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
-    def compute_loss(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    def compute_loss(
+        self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
+    ) -> torch.Tensor:
         if self.dataset.output_mode == "classification":
             loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))
+        elif self.dataset.output_mode == "token_classification":
+            assert mask.any(dim=-1).all()
+            loss = F.cross_entropy(
+                logits.view(-1, logits.shape[-1]), labels.view(-1), reduction="none"
+            )
+            loss = loss.view_as(labels) * mask
+            if reduce:
+                loss = loss.sum() / mask.sum()
         elif self.dataset.output_mode == "regression":
             loss = F.mse_loss(logits.view(-1), labels.view(-1))
         else:
@@ -145,30 +124,41 @@ class Model(pl.LightningModule):
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, Any]:
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
-        return {"loss": self.compute_loss(self(batch)["logits"], batch["labels"])}
+        loss = self.compute_loss(self(batch)["logits"], batch["labels"], batch.get("label_mask"))
+        return {"loss": loss}
+
+    def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        if self.dataset.output_mode in ("classification", "token_classification"):
+            return logits.argmax(dim=-1)
+        elif self.dataset.output_mode == "regression":
+            return logits.squeeze(dim=-1)
+        else:
+            raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
 
     def eval_step(
-        self, batch: dict[str, torch.Tensor], batch_idx: int, mode: str, dataloader_idx=0
+        self,
+        batch: dict[str, torch.Tensor],
+        batch_idx: int,
+        mode: str,
+        dataloader_idx=0,
+        compute_loss=True,
     ) -> dict[str, Any]:
         assert mode in {"dev", "test"}
 
         logits = self(batch)["logits"]
+        preds = self.get_predictions(logits, batch)
         labels = batch["labels"]
-        assert logits.dim() == 2 and labels.dim() == 1
-
-        if self.dataset.output_mode == "classification":
-            preds = logits.argmax(dim=1)
-        elif self.dataset.output_mode == "regression":
-            preds = logits.squeeze(dim=1)
-        else:
-            raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
 
         splits = self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits
         split = splits[dataloader_idx]
         for metric in self.metrics[split].values():
             metric(*metric.detach_tensors(preds, labels))
 
-        return {"loss": self.compute_loss(logits, labels).detach().cpu()}
+        return (
+            {"loss": self.compute_loss(logits, labels, batch.get("label_mask")).detach().cpu()}
+            if compute_loss
+            else {}
+        )
 
     def eval_epoch_end(self, outputs: list[dict[str, Any]], mode: str):
         assert isinstance(outputs, list)
@@ -218,12 +208,12 @@ class Model(pl.LightningModule):
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
-        parser.add_argument("--learning_rate", default=2e-5, type=float)
+        parser.add_argument("--lr", default=2e-5, type=float)
         parser.add_argument("--weight_decay", default=0.0, type=float)
         parser.add_argument("--gradient_clip_val", default=1.0, type=float)
         parser.add_argument("--accumulate_grad_batches", default=1, type=int)
         parser.add_argument("--adam_epsilon", default=1e-8, type=float)
         parser.add_argument("--warmup_steps", default=0, type=int)
-        parser.add_argument("--epochs", default=3, type=int, dest="max_epochs")
+        parser.add_argument("--epochs", default=3, type=int)
         parser.add_argument("--batch_size", default=32, type=int)
         parser.add_argument("--eval_batch_size", default=32, type=int)
