@@ -148,7 +148,7 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
 
     trainer = pl.Trainer(
         default_root_dir=args.output_dir,
-        gradient_clip_val=args.gradient_clip_val,
+        gradient_clip_val=args.clip_norm,
         gpus=args.gpus,
         accumulate_grad_batches=args.accumulate_grad_batches,
         max_epochs=args.epochs,

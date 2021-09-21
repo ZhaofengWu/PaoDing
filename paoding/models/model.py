@@ -215,7 +215,7 @@ class Model(pl.LightningModule):
     def add_args(parser: argparse.ArgumentParser):
         parser.add_argument("--lr", default=2e-5, type=float)
         parser.add_argument("--weight_decay", default=0.0, type=float)
-        parser.add_argument("--gradient_clip_val", default=1.0, type=float)
+        parser.add_argument("--clip_norm", default=0.0, type=float)
         parser.add_argument("--accumulate_grad_batches", default=1, type=int)
         parser.add_argument("--adam_epsilon", default=1e-8, type=float)
         parser.add_argument("--warmup_steps", default=0, type=int)
