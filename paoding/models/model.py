@@ -129,12 +129,9 @@ class Model(pl.LightningModule):
         return {"loss": loss}
 
     def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        if self.dataset.output_mode in ("classification", "token_classification"):
-            return logits.argmax(dim=-1)
-        elif self.dataset.output_mode == "regression":
-            return logits.squeeze(dim=-1)
-        else:
-            raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
+        # allennlp metrics expect the origiinal logits for at least classification tasks.
+        # We'll support more when we come to it.
+        return logits
 
     def eval_step(
         self,
