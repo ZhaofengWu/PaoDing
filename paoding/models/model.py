@@ -1,6 +1,6 @@
 import argparse
 from collections import defaultdict
-from typing import Any
+from typing import Any, Union
 
 from allennlp.training.metrics import Metric
 import pytorch_lightning as pl
@@ -87,7 +87,8 @@ class Model(pl.LightningModule):
         effective_batch_size = (
             self.hparams.batch_size * self.hparams.accumulate_grad_batches * num_devices
         )
-        total_steps = (self.dataset_size / effective_batch_size) * self.hparams.epochs
+        # Sometimes dataset_size could be smaller than the effective_batch_size
+        total_steps = max(self.dataset_size / effective_batch_size, 1) * self.hparams.epochs
 
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=self.hparams.warmup_steps, num_training_steps=total_steps
@@ -160,28 +161,32 @@ class Model(pl.LightningModule):
             else {}
         )
 
-    def eval_epoch_end(self, outputs: list[dict[str, Any]], mode: str):
-        assert isinstance(outputs, list)
+    def eval_epoch_end(
+        self, outputs: Union[list[list[dict[str, Any]]], list[dict[str, Any]]], mode: str
+    ):
         assert mode in {"dev", "test"}
+
+        # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
+        # so we need a check here.
+        num_splits = 1 if isinstance(outputs[0], dict) else len(outputs)
 
         # We gather individual metrics from each dataloader and compute the average if there is
         # more than one
-        more_than_1 = len(outputs) > 1
-        if more_than_1:
+        if num_splits > 1:
             sums = defaultdict(int)
-        for i in range(len(outputs)):
+        for i in range(num_splits):
             split = (self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits)[i]
             assert split != "avg"  # reserved keyword for below
             metrics = self.get_metrics(split, reset=True)
             for k, v in metrics.items():
-                if more_than_1:
+                if num_splits > 1:
                     self.log(f"{k}_{split}", v)
                     sums[k] += v
                 else:
                     self.log(k, v)
-        if more_than_1:
+        if num_splits > 1:
             for k, v in sums.items():
-                self.log(f"{k}_avg", v / len(outputs))
+                self.log(f"{k}_avg", v / num_splits)
 
     def get_metrics(self, split: str, reset=False) -> dict[str, Any]:
         metrics = {name: metric.get_metric() for name, metric in self.metrics[split].items()}
