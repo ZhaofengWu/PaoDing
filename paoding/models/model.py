@@ -84,11 +84,14 @@ class Model(pl.LightningModule):
 
     def get_lr_scheduler(self, optimizer: Optimizer) -> dict:
         num_devices = max(1, self.hparams.gpus)  # TODO: consider num_tpu_cores
-        effective_batch_size = (
-            self.hparams.batch_size * self.hparams.accumulate_grad_batches * num_devices
-        )
-        # Sometimes dataset_size could be smaller than the effective_batch_size
-        total_steps = max(self.dataset_size / effective_batch_size, 1) * self.hparams.epochs
+        if self.hparams.lr_scheduler_total_steps is not None:
+            total_steps = self.hparams.lr_scheduler_total_steps
+        else:
+            effective_batch_size = (
+                self.hparams.batch_size * self.hparams.accumulate_grad_batches * num_devices
+            )
+            # Sometimes dataset_size could be smaller than the effective_batch_size
+            total_steps = max(self.dataset_size / effective_batch_size, 1) * self.hparams.epochs
 
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=self.hparams.warmup_steps, num_training_steps=total_steps
@@ -216,6 +219,7 @@ class Model(pl.LightningModule):
         parser.add_argument("--accumulate_grad_batches", default=1, type=int)
         parser.add_argument("--adam_epsilon", default=1e-8, type=float)
         parser.add_argument("--warmup_steps", default=0, type=int)
+        parser.add_argument("--lr_scheduler_total_steps", default=None, type=int)
         parser.add_argument("--epochs", default=3, type=int)
         parser.add_argument("--batch_size", default=32, type=int)
         parser.add_argument("--eval_batch_size", default=32, type=int)
