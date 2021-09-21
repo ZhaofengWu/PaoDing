@@ -93,9 +93,9 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
     add_generic_args(parser)
     model_class.add_args(parser)
     dataset_class.add_args(parser)
-    args = parser.parse_args(args=args)
+    hparams = parser.parse_args(args=args)
 
-    output_dir = args.output_dir
+    output_dir = hparams.output_dir
     if os.path.exists(output_dir):
         content = os.listdir(output_dir)
         # For DDP, when subprocesses are launched, there'll be a log.txt inside the folder already
@@ -105,23 +105,27 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
         os.mkdir(output_dir)
 
     assert (
-        getattr(args, "model_class", None) is None and getattr(args, "dataset_class", None) is None
+        getattr(hparams, "model_class", None) is None
+        and getattr(hparams, "dataset_class", None) is None
     )
-    args.model_class = model_class
-    args.dataset_class = dataset_class
+    hparams.model_class = model_class
+    hparams.dataset_class = dataset_class
     json.dump(
-        {k: str(v) if k in ("model_class", "dataset_class") else v for k, v in vars(args).items()},
-        open(os.path.join(output_dir, "args.json"), "w"),
+        {
+            k: str(v) if k in ("model_class", "dataset_class") else v
+            for k, v in vars(hparams).items()
+        },
+        open(os.path.join(output_dir, "hparams.json"), "w"),
     )
 
-    if args.gpus is None:
-        args.gpus = (
+    if hparams.gpus is None:
+        hparams.gpus = (
             len(os.environ["CUDA_VISIBLE_DEVICES"].split(","))
             if "CUDA_VISIBLE_DEVICES" in os.environ
             else 0
         )
 
-    pl.seed_everything(args.seed)
+    pl.seed_everything(hparams.seed)
 
     # Set by pytorch-lightning
     local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
@@ -135,7 +139,7 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
         ],
     )
 
-    model = model_class(args)
+    model = model_class(hparams)
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=output_dir,
@@ -147,12 +151,12 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
     )
 
     trainer = pl.Trainer(
-        default_root_dir=args.output_dir,
-        gradient_clip_val=args.clip_norm,
-        gpus=args.gpus,
-        accumulate_grad_batches=args.accumulate_grad_batches,
-        max_epochs=args.epochs,
-        precision=16 if args.fp16 else 32,
+        default_root_dir=hparams.output_dir,
+        gradient_clip_val=hparams.clip_norm,
+        gpus=hparams.gpus,
+        accumulate_grad_batches=hparams.accumulate_grad_batches,
+        max_epochs=hparams.epochs,
+        precision=16 if hparams.fp16 else 32,
         callbacks=[LoggingCallback(), checkpoint_callback],
         replace_sampler_ddp=False,
     )
