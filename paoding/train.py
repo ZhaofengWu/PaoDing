@@ -6,6 +6,12 @@ import json
 from pathlib import Path
 from typing import Any, Type
 
+# PyTorch-Lightning's interruption of sigterm when using slurm seems to cause issues with
+# multiprocessing. See https://github.com/PyTorchLightning/pytorch-lightning/issues/5225
+# and https://github.com/PyTorchLightning/pytorch-lightning/issues/5969. So disabling it.
+del os.environ["SLURM_NTASKS"]
+del os.environ["SLURM_JOB_NAME"]
+
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
 
