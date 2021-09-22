@@ -4,7 +4,7 @@ import logging
 import os
 import json
 from pathlib import Path
-from typing import Type
+from typing import Any, Type
 
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
@@ -88,7 +88,7 @@ def add_generic_args(parser: argparse.ArgumentParser):
     parser.add_argument("--seed", type=int, default=42)
 
 
-def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse.Namespace = None):
+def train(model_class: Type[Model], dataset_class: Type[Dataset], args: list) -> tuple[str, Any]:
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
     model_class.add_args(parser)
@@ -141,6 +141,7 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
 
     model = model_class(hparams)
 
+    loging_callback = LoggingCallback()
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=output_dir,
         filename=f"{{epoch}}_{{{model.dataset.metric_to_watch}:.4f}}",
@@ -157,7 +158,7 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
         accumulate_grad_batches=hparams.accumulate_grad_batches,
         max_epochs=hparams.epochs,
         precision=16 if hparams.fp16 else 32,
-        callbacks=[LoggingCallback(), checkpoint_callback],
+        callbacks=[loging_callback, checkpoint_callback],
         replace_sampler_ddp=False,
     )
     trainer.fit(model)
@@ -167,3 +168,5 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: argparse
             checkpoint_callback.best_model_path,
             Path(checkpoint_callback.best_model_path).parent / "best.ckpt",
         )
+
+    return model.dataset.metric_to_watch, loging_callback.best_dev_metric
