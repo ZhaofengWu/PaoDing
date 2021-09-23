@@ -33,7 +33,7 @@ class LoggingCallback(pl.Callback):
     @rank_zero_only
     def on_validation_end(self, trainer: pl.Trainer, pl_module: Model):
         logger.info("")
-        logger.info("***** Validation results *****")
+        logger.info(f"***** Validation results at epoch {trainer.current_epoch} *****")
 
         assert pl_module.dataset.metric_watch_mode in {"max", "min"}
 
@@ -143,6 +143,7 @@ def train(model_class: Type[Model], dataset_class: Type[Dataset], args: list) ->
             logging.FileHandler(os.path.join(output_dir, "log.txt")),
             logging.StreamHandler(),
         ],
+        force=True,
     )
 
     model = model_class(hparams)
