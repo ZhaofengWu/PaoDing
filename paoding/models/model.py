@@ -13,8 +13,10 @@ from transformers import AdamW
 
 
 class Model(pl.LightningModule):
-    def __init__(self, hparams: argparse.Namespace):
+    def __init__(self, hparams: Union[argparse.Namespace, dict]):
         super().__init__()
+        if isinstance(hparams, dict):
+            hparams = argparse.Namespace(**hparams)
         self.save_hyperparameters(hparams)
         # pytorch-lightning calls this, but we call it ourselves here in case the __init__ of
         # children modules need dataset attributes, e.g., num_labels
