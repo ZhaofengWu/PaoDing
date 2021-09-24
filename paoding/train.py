@@ -94,7 +94,9 @@ def add_generic_args(parser: argparse.ArgumentParser):
     parser.add_argument("--seed", type=int, default=42)
 
 
-def train(model_class: Type[Model], dataset_class: Type[Dataset], args: list) -> tuple[str, Any]:
+def train(
+    model_class: Type[Model], dataset_class: Type[Dataset], args: list = None
+) -> tuple[str, Any]:
     parser = argparse.ArgumentParser()
     add_generic_args(parser)
     model_class.add_args(parser)
