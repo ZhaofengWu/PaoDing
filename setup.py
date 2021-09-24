@@ -25,10 +25,10 @@ setup(
         "allennlp @ git+https://github.com/allenai/allennlp.git@a09d057cb2c711743e3a3fc8597398f37165f71a",
         "datasets==1.12.1",
         "numpy==1.21.2",
-        "pytorch-lightning==1.4.7",
-        "torch==1.9.0",
+        "pytorch-lightning==1.4.8",
+        "torch==1.9.1",
         "tqdm==4.62.2",
-        "transformers==4.10.2",
+        "transformers==4.10.3",
     ],
     python_requires=">=3.9.0",
 )
