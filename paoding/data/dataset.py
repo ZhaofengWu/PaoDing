@@ -116,7 +116,7 @@ class Dataset:
             text_pair=examples[self.second_text_key] if self.second_text_key is not None else None,
             padding=False,  # we control this in the collator
             truncation=True,
-            max_length=self.tokenizer.model_max_len,
+            max_length=self.hparams.max_length,
         )
 
     def preprocess(self, dataset_dict: DatasetDict) -> DatasetDict:
@@ -188,7 +188,7 @@ class Dataset:
             help="The location to data for local datasets, and the directory where the data cache"
             " will be stored for all datasets.",
         )
-        parser.add_argument(  # subclasses should use this when instantiating the tokenizer
+        parser.add_argument(
             "--max_length",
             default=None,
             type=int,
