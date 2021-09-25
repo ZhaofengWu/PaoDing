@@ -75,7 +75,7 @@ class Dataset:
 
     @property
     def label_key(self) -> str:
-        """For text pairs, the key in the example dictionary for the second text."""
+        """The key in the example dictionary for the label."""
         return "label"
 
     @property
