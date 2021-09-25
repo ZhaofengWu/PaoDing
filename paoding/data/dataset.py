@@ -22,17 +22,23 @@ class Dataset:
     and a tokenizer.
     """
 
-    def __init__(self, hparams: argparse.Namespace):
+    def __init__(self, hparams: argparse.Namespace, preprocess_and_save=True):
+        """
+        Input:
+            preprocess_and_save: sometimes a Dataset is used as an intermediate processing step,
+                in which case no preprocessing and persistence may be necessary.
+        """
         self.hparams = hparams
-        self.tokenizer = self.setup_tokenizer()
-
-        if os.path.exists(self.cache_path):
-            self.dataset_dict = DatasetDict.load_from_disk(self.cache_path)
-            return
+        if preprocess_and_save:
+            self.tokenizer = self.setup_tokenizer()
+            if os.path.exists(self.cache_path):
+                self.dataset_dict = DatasetDict.load_from_disk(self.cache_path)
+                return
 
         self.dataset_dict = self.load()
-        self.dataset_dict = self.preprocess(self.dataset_dict)
-        self.dataset_dict.save_to_disk(self.cache_path)
+        if preprocess_and_save:
+            self.dataset_dict = self.preprocess(self.dataset_dict)
+            self.dataset_dict.save_to_disk(self.cache_path)
 
     def __getitem__(self, key: str) -> HFDataset:
         return self.dataset_dict[key]

@@ -13,12 +13,13 @@ class LocalDataset(Dataset):
         hparams: argparse.Namespace,
         split_filename: Callable[[str], str],
         *load_args,
+        preprocess_and_save=True,
         **load_kwargs,
     ):
         self.split_filename = split_filename
         self.load_args = load_args
         self.load_kwargs = load_kwargs
-        super().__init__(hparams)
+        super().__init__(hparams, preprocess_and_save=preprocess_and_save)
 
     def load(self) -> DatasetDict:
         dataset_dict = load_dataset(
