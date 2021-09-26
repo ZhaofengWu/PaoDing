@@ -168,7 +168,7 @@ class Dataset:
             sampler=sampler,
             num_workers=2,
             collate_fn=lambda batch: collate_fn(
-                batch, pad_token_map, self.tokenizer.padding_side, self.output_mode
+                batch, self.label_key, pad_token_map, self.tokenizer.padding_side, self.output_mode
             ),
             pin_memory=True,
         )
@@ -176,8 +176,8 @@ class Dataset:
 
     def pad_token_map(self, split: str) -> dict[str, PAD_TYPE]:
         """
-        Specifies the padding for each key. Only keys including in this map will be included in the
-        batch.
+        Specifies the padding for each key. Only keys including in this map plus the label will be
+        included in the batch.
         """
         return {
             "input_ids": self.tokenizer.pad_token_id,

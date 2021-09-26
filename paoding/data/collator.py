@@ -40,26 +40,27 @@ def _tensorize(sequence: np.ndarray, name: str, output_mode: str) -> torch.Tenso
     dtype = torch.long
     if name == "labels" and output_mode == "regression":
         dtype = torch.float
-    elif name == "attention_mask":
+    elif "attention_mask" in name:
         dtype = torch.bool
     return torch.tensor(sequence, dtype=dtype)
 
 
 def collate_fn(
     batch: list[dict[str, list]],
+    label_key: str,
     pad_token_map: dict[str, PAD_TYPE],
     padding_side: str,
     output_mode: str,
 ) -> dict[str, torch.Tensor]:
     """
     Input:
-        pad_token_map: specifies the padding for each key. Only keys including in this map, plus
-            "labels", will be included in the batch.
+        pad_token_map: specifies the padding for each key. Only keys including in this map plus the
+            label will be included in the batch.
     """
     batch = [{k: np.array(v) for k, v in e.items()} for e in batch]
     max_shapes = _find_max_shapes(batch, pad_token_map.keys())
     for i, e in enumerate(batch):
-        batch[i] = {"labels": e["labels"]} | {
+        batch[i] = {"labels": e[label_key]} | {
             k: _pad(e[k], pad_token, max_shapes[k] - np.array(e[k].shape), padding_side)
             for k, pad_token in pad_token_map.items()
         }
