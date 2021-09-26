@@ -1,6 +1,7 @@
 """Adapted from https://github.com/huggingface/transformers/blob/v4.0.0/examples/seq2seq/utils.py"""
 
 import math
+import random
 from typing import Iterable
 
 import numpy as np
@@ -48,11 +49,12 @@ def sortish_sampler_indices(lens: list[int], bs: int, perturb=True) -> np.array:
     ck_idx = [sort_idx[i : i + sz] for i in range(0, len(sort_idx), sz)]
     max_ck = np.argmax([key_fn(ck[0]) for ck in ck_idx])  # find the chunk with the largest key,
     ck_idx[0], ck_idx[max_ck] = ck_idx[max_ck], ck_idx[0]  # then make sure it goes first.
-    sort_idx = (
-        np.concatenate(np.random.permutation(ck_idx[1:]))
-        if len(ck_idx) > 1
-        else np.array([], dtype=np.int)
-    )
+    if len(ck_idx) > 1:
+        sort_idx = ck_idx[1:]
+        random.shuffle(sort_idx)
+        sort_idx = np.concatenate(sort_idx)
+    else:
+        sort_idx = np.array([], dtype=np.int)
     sort_idx = np.concatenate((ck_idx[0], sort_idx))
     return sort_idx.tolist()
 
