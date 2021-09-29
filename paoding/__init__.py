@@ -3,3 +3,4 @@ from .data.local_dataset import LocalDataset
 from .models.model import Model
 from .modules.pooler import Pooler
 from .modules.transformer import Transformer
+from .data.tokenizer import Tokenizer
