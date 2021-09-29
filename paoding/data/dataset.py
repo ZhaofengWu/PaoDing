@@ -46,7 +46,7 @@ class Dataset:
     @property
     def hash_fields(self) -> list[Any]:
         """For cache purpose"""
-        return [self.tokenizer.__repr__]
+        return [self.tokenizer.__repr__()]
 
     @property
     def cache_path(self) -> str:
