@@ -11,10 +11,14 @@ from transformers import PreTrainedTokenizerBase
 
 from paoding.data.collator import collate_fn, PAD_TYPE
 from paoding.data.sortish_sampler import make_sortish_sampler
+from paoding.utils import get_logger
 
 # Sometimes we want to change the implementation of methods, etc., which cache ignores.
 # We maintain our own cache so this is not very useful anyway.
 datasets.set_caching_enabled(False)
+
+logger = get_logger(__name__)
+
 
 class Dataset:
     """
@@ -32,12 +36,14 @@ class Dataset:
         if preprocess_and_save:
             self.tokenizer = self.setup_tokenizer()
             if os.path.exists(self.cache_path):
+                logger.info(f"Reusing cache at {self.cache_path}")
                 self.dataset_dict = DatasetDict.load_from_disk(self.cache_path)
                 return
 
         self.dataset_dict = self.load()
         if preprocess_and_save:
             self.dataset_dict = self.preprocess(self.dataset_dict)
+            logger.info(f"Saving dataset cache at {self.cache_path}")
             self.dataset_dict.save_to_disk(self.cache_path)
 
     def __getitem__(self, key: str) -> HFDataset:

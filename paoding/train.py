@@ -19,9 +19,10 @@ reload(logging)
 
 from paoding.data.dataset import Dataset
 from paoding.models.model import Model
+from paoding.utils import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LoggingCallback(pl.Callback):
