@@ -1,5 +1,7 @@
 import gc
 import math
+from pathlib import Path
+import sys
 
 import torch
 
@@ -17,3 +19,7 @@ def gpu_tensors(precision=32):
         except:
             pass
     print(f"In MB: {agg}")
+
+
+def add_parent_dir_to_path(file: str):
+    sys.path.append(str(Path(file).parent.parent.absolute()))
