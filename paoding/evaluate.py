@@ -2,6 +2,12 @@ import argparse
 import os
 from typing import Type
 
+# PyTorch-Lightning's interruption of sigterm when using slurm seems to cause issues with
+# multiprocessing. See https://github.com/PyTorchLightning/pytorch-lightning/issues/5225
+# and https://github.com/PyTorchLightning/pytorch-lightning/issues/5969. So disabling it.
+os.environ.pop("SLURM_NTASKS", None)
+os.environ.pop("SLURM_JOB_NAME", None)
+
 import pytorch_lightning as pl
 
 from paoding.models.model import Model
