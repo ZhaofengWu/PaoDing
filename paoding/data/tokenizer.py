@@ -43,6 +43,21 @@ class Tokenizer(PreTrainedTokenizerBase):
     ) -> dict[str, Any]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
+    # The following methods assume 1-1 mapping between tokens and IDs. If this doesn't apply,
+    # override.
+
+    def convert_tokens_to_ids(self, tokens: list[str]) -> list[int]:
+        return [self.convert_token_to_id(token) for token in tokens]
+
+    def convert_token_to_id(self, token: str) -> int:
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    def convert_ids_to_tokens(self, ids: list[int]) -> list[str]:
+        return [self.convert_id_to_token(id) for id in ids]
+
+    def convert_id_to_token(self, id: int) -> str:
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
     # Below are methods implemented in the superclass. We don't want the superclass implementation
     # do be accidentally used.
 
