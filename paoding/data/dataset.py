@@ -8,9 +8,9 @@ import datasets
 from datasets import DatasetDict, Dataset as HFDataset
 from torch.utils.data.dataloader import DataLoader
 from transformers import PreTrainedTokenizerBase
+from transformers.trainer_pt_utils import LengthGroupedSampler
 
 from paoding.data.collator import collate_fn, PAD_TYPE
-from paoding.data.sortish_sampler import make_sortish_sampler
 from paoding.utils import get_logger
 
 # Sometimes we want to change the implementation of methods, etc., which cache ignores.
@@ -158,11 +158,15 @@ class Dataset:
 
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset_dict[split]
-        lens = [len(ids) for ids in dataset_split[self.sort_key]]
         if shuffle:
-            sampler = make_sortish_sampler(
-                lens, batch_size, distributed=self.hparams.gpus > 1, perturb=True
-            )
+            # LengthGroupedSampler sorts from longest to shortest; we want the reverse
+            lens = [-len(ids) for ids in dataset_split[self.sort_key]]
+            if self.hparams.gpus <= 1:
+                sampler = LengthGroupedSampler(None, batch_size, lengths=lens)
+            else:
+                # TODO: support this when https://github.com/huggingface/transformers/commit/1b74af76b7e5c259d1470dec9d8d68c303dea5db is released
+                # and also remove the None from above
+                raise NotImplementedError()
         else:
             sampler = None
         pad_token_map = self.pad_token_map(split)
