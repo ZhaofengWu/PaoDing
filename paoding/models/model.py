@@ -129,8 +129,9 @@ class Model(pl.LightningModule):
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, Any]:
-        self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
         loss = self.compute_loss(self(batch)["logits"], batch["labels"], batch.get("label_mask"))
+        self.log("train_loss", loss)
+        self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
         return {"loss": loss}
 
     def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
