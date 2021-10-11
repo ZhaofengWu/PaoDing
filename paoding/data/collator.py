@@ -36,9 +36,10 @@ def _pad(
     return np.pad(sequence, padding, constant_values=padding_token)
 
 
-def _tensorize(sequence: np.ndarray, name: str, output_mode: str) -> torch.Tensor:
+def _tensorize(sequence: np.ndarray, name: str, output_mode: str, label_key: str) -> torch.Tensor:
+    # TODO: this can be smarter
     dtype = torch.long
-    if name == "labels" and output_mode == "regression":
+    if name == label_key and output_mode == "regression":
         dtype = torch.float
     elif "attention_mask" in name:
         dtype = torch.bool
@@ -55,14 +56,15 @@ def collate_fn(
     """
     Input:
         pad_token_map: specifies the padding for each key. Only keys including in this map plus the
-            label will be included in the batch.
+            label will be included in the batch. By default, the labels will NOT be padded, but if
+            it needs to be padded, simply pass it as a part of pad_token_map.
     """
     batch = [{k: np.array(v) for k, v in e.items()} for e in batch]
     max_shapes = _find_max_shapes(batch, pad_token_map.keys())
     for i, e in enumerate(batch):
-        batch[i] = {"labels": e[label_key]} | {
+        batch[i] = {label_key: e[label_key]} | {
             k: _pad(e[k], pad_token, max_shapes[k] - np.array(e[k].shape), padding_side)
             for k, pad_token in pad_token_map.items()
-        }
-        batch[i] = {k: _tensorize(v, k, output_mode) for k, v in batch[i].items()}
+        }  # dict concatenation overrides label_key if present
+        batch[i] = {k: _tensorize(v, k, output_mode, label_key) for k, v in batch[i].items()}
     return default_collate(batch)

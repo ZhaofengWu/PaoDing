@@ -129,7 +129,9 @@ class Model(pl.LightningModule):
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, Any]:
-        loss = self.compute_loss(self(batch)["logits"], batch["labels"], batch.get("label_mask"))
+        loss = self.compute_loss(
+            self(batch)["logits"], batch[self.dataset.label_key], batch.get("label_mask")
+        )
         self.log("train_loss", loss)
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
         return {"loss": loss}
@@ -154,7 +156,7 @@ class Model(pl.LightningModule):
 
         logits = self(batch)["logits"]
         preds = self.get_predictions(logits, batch)
-        labels = batch["labels"]
+        labels = batch[self.dataset.label_key]
 
         splits = self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits
         split = splits[dataloader_idx]
