@@ -1,15 +1,19 @@
 from typing import Any, Union
 
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizer
 
 
-class Tokenizer(PreTrainedTokenizerBase):
+class Tokenizer(PreTrainedTokenizer):
     def __init__(self, **kwargs):
-        super().__init__(padding_side="right", pad_token="<PAD>")
+        super().__init__(padding_side="right", pad_token="<PAD>", mask_token="<MASK>")
 
     @property
     def pad_token_id(self) -> int:
         return 0
+
+    @property
+    def mask_token_id(self) -> int:
+        return 1
 
     def __repr__(self) -> str:
         return self.__class__.__name__
@@ -38,28 +42,8 @@ class Tokenizer(PreTrainedTokenizerBase):
         else:
             return self._tokenize(text, **kwargs)
 
-    def _tokenize(
-        self, text: str, add_special_tokens=False, truncation=False, max_length=None
-    ) -> dict[str, Any]:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    # The following methods assume 1-1 mapping between tokens and IDs. If this doesn't apply,
-    # override.
-
-    def convert_tokens_to_ids(self, tokens: list[str]) -> list[int]:
-        return [self.convert_token_to_id(token) for token in tokens]
-
-    def convert_token_to_id(self, token: str) -> int:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    def convert_ids_to_tokens(self, ids: list[int]) -> list[str]:
-        return [self.convert_id_to_token(id) for id in ids]
-
-    def convert_id_to_token(self, id: int) -> str:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
     # Below are methods implemented in the superclass. We don't want the superclass implementation
-    # do be accidentally used.
+    # to be accidentally used.
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
