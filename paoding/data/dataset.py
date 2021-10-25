@@ -178,7 +178,11 @@ class Dataset:
             sampler=sampler,
             num_workers=2,
             collate_fn=lambda batch: collate_fn(
-                batch, self.label_key, pad_token_map, self.tokenizer.padding_side, self.output_mode
+                self.before_collation(batch),
+                self.label_key,
+                pad_token_map,
+                self.tokenizer.padding_side,
+                self.output_mode,
             ),
             pin_memory=True,
         )
@@ -194,6 +198,12 @@ class Dataset:
             "attention_mask": False,
             "token_type_ids": self.tokenizer.pad_token_type_id,
         }
+
+    def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:
+        """
+        Allows subclasses to have a chance to modify the batch
+        """
+        return batch
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
