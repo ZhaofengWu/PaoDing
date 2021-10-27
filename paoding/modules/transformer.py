@@ -39,16 +39,16 @@ class Transformer(torch.nn.Module):
         self.config = AutoConfig.from_pretrained(hparams.model_name_or_path, **config_args)
         self.model = TASKS[task].from_pretrained(hparams.model_name_or_path, config=self.config)
 
-        if not trainable:  # TODO: support this
+        if not trainable:
+            # TODO: support this
             assert task == "base", "No support for freezing the backbone for headed tasks yet"
-        self.trainable = trainable
+            for param in self.model.parameters():
+                param.requires_grad = False
 
     def forward(self, *args, **kwargs):
         if "attention_mask" in kwargs:  # `transformers` doesn't take bool masks which is crazy
             kwargs["attention_mask"] = kwargs["attention_mask"].float()
-        # If grad was previous disabled (e.g., in eval), don't change it
-        with torch.set_grad_enabled(torch.is_grad_enabled() and self.trainable):
-            return self.model(*args, **kwargs)
+        return self.model(*args, **kwargs)
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
