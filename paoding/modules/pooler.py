@@ -6,7 +6,7 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-POOLING_MODES = {"avg", "max", "last", "attn", "attn_k", "attn_kv"}
+POOLING_MODES = {"avg", "max", "first", "last", "attn", "attn_k", "attn_kv"}
 
 
 class Pooler(torch.nn.Module):
@@ -42,6 +42,9 @@ class Pooler(torch.nn.Module):
                 return tensor.max(1)
             else:
                 return masked_max(tensor, mask.unsqueeze(-1), 1)
+        elif self.hparams.pooling_mode == "first":
+            assert mask[:, 0].all()
+            return tensor[:, 0, :]
         elif self.hparams.pooling_mode == "last":
             if mask is None:
                 return tensor[:, -1, :]
