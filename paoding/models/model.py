@@ -31,6 +31,7 @@ class Model(pl.LightningModule):
         if stage != "fit":
             return
 
+        # TODO: maybe simply get len(dataset) so we don't have to create a dataloader?
         self._train_dataloader = self.dataset.dataloader(
             "train", self.hparams.batch_size, shuffle=True
         )

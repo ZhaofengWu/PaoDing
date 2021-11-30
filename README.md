@@ -2,6 +2,8 @@
 
 An NLP-oriented PyTorch wrapper that makes your life easier. It is in spirit similar to AllenNLP. The goal of this library is to hide all boilerplate code. I created it so that I don't have to dig through the codebase to understand how something works in other libraries or create a PR every time I find something inconvenient to use.
 
+NB: if you want to use this library for development, it might be easier to `pip install -e .` from source, so that you can put breakpoints anywhere.
+
 ## Etymology
 
 Pao Ding (庖丁) is a character in the classic ancient Chinese text [Zhuangzi](https://en.wikipedia.org/wiki/Zhuangzi_(book)), published around the 3rd century BC. Pao (庖) means cook, his occupation, and Ding (丁) is his name.

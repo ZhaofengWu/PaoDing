@@ -11,6 +11,7 @@ from transformers import (
     AutoModelForSequenceClassification,
     AutoModelForTokenClassification,
     AutoModelForCausalLM,
+    AutoModelForMaskedLM,
 )
 
 
@@ -23,6 +24,7 @@ TASKS = {
     "question-answering": AutoModelForQuestionAnswering,
     "pretraining": AutoModelForPreTraining,
     "token-classification": AutoModelForTokenClassification,
+    "masked-lm": AutoModelForMaskedLM,
     "causal-lm": AutoModelForCausalLM,
     "summarization": AutoModelForSeq2SeqLM,
     "translation": AutoModelForSeq2SeqLM,

@@ -5,7 +5,7 @@ from transformers import PreTrainedTokenizer
 
 class Tokenizer(PreTrainedTokenizer):
     def __init__(self, **kwargs):
-        super().__init__(padding_side="right", pad_token="<PAD>", mask_token="<MASK>")
+        super().__init__(padding_side="right", pad_token="<PAD>", mask_token="<MASK>", cls_token="<CLS>", sep_token="<SEP>")
 
     @property
     def pad_token_id(self) -> int:
@@ -14,6 +14,14 @@ class Tokenizer(PreTrainedTokenizer):
     @property
     def mask_token_id(self) -> int:
         return 1
+
+    @property
+    def cls_token_id(self) -> int:
+        return 2
+
+    @property
+    def sep_token_id(self) -> int:
+        return 3
 
     def __repr__(self) -> str:
         return self.__class__.__name__
@@ -69,9 +77,6 @@ class Tokenizer(PreTrainedTokenizer):
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     def batch_decode(self, *args, **kwargs):
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    def decode(self, *args, **kwargs):
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     def prepare_seq2seq_batch(self, *args, **kwargs):

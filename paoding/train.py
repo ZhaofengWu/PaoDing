@@ -174,9 +174,8 @@ def train(
     trainer.fit(model)
 
     if local_rank <= 0:
-        os.symlink(
-            checkpoint_callback.best_model_path,
-            Path(checkpoint_callback.best_model_path).parent / "best.ckpt",
-        )
+        symlink_path = Path(checkpoint_callback.best_model_path).parent / "best.ckpt"
+        os.symlink(checkpoint_callback.best_model_path, symlink_path)
+        print(f"Model saved at {symlink_path} -> {checkpoint_callback.best_model_path}")
 
     return model.dataset.metric_to_watch, loging_callback.best_dev_metric
