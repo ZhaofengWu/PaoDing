@@ -1,6 +1,6 @@
 # PaoDing
 
-An NLP-oriented PyTorch wrapper that makes your life easier. It is in spirit similar to AllenNLP. The goal of this library is to hide all boilerplate code. I created it so that I don't have to dig through the codebase to understand how something works in other libraries or create a PR every time I find something inconvenient to use.
+An opiniated NLP-oriented PyTorch wrapper that makes your life easier. It is in spirit similar to AllenNLP. The goal of this library is to hide all boilerplate code. I created it so that I don't have to dig through the codebase to understand how something works in other libraries or create a PR every time I find something inconvenient to use. Also, perhaps in contrast to other libraries, the hiding of boilerplate is aggressive -- when something could either be hidden or not hidden, it usually errs on the side of hiding it.
 
 NB: if you want to use this library for development, it might be easier to `pip install -e .` from source, so that you can put breakpoints anywhere.
 
