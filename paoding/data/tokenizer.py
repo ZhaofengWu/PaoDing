@@ -5,7 +5,20 @@ from transformers import PreTrainedTokenizer
 
 class Tokenizer(PreTrainedTokenizer):
     def __init__(self, **kwargs):
-        super().__init__(padding_side="right", pad_token="<PAD>", mask_token="<MASK>", cls_token="<CLS>", sep_token="<SEP>")
+        super().__init__(
+            padding_side="right",
+            pad_token="<PAD>",
+            mask_token="<MASK>",
+            cls_token="<CLS>",
+            sep_token="<SEP>",
+        )
+        self.special_token_to_id = {
+            "<PAD>": self.pad_token_id,
+            "<MASK>": self.mask_token_id,
+            "<CLS>": self.cls_token_id,
+            "<SEP>": self.sep_token_id,
+        }
+        self.special_id_to_token = {v: k for k, v in self.special_token_to_id.items()}
 
     @property
     def pad_token_id(self) -> int:
@@ -29,7 +42,7 @@ class Tokenizer(PreTrainedTokenizer):
     def __call__(
         self,
         text: Union[str, list[str]],
-        add_special_tokens=False,
+        add_special_tokens=True,
         truncation=False,
         max_length=None,
     ) -> dict[str, Any]:
