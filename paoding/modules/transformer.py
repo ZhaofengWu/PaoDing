@@ -40,6 +40,8 @@ class Transformer(torch.nn.Module):
             config_args["add_pooling_layer"] = False
         self.config = AutoConfig.from_pretrained(hparams.model_name_or_path, **config_args)
         self.model = TASKS[task].from_pretrained(hparams.model_name_or_path, config=self.config)
+        if hparams.random_init_transformer:
+            self.model = type(self.model)(self.config)
 
         if not trainable:
             # TODO: support this
@@ -61,5 +63,6 @@ class Transformer(torch.nn.Module):
             required=True,
             help="Path to pretrained model or model identifier from huggingface.co/models",
         )
+        parser.add_argument("--random_init_transformer", action="store_true")
 
         return parser
