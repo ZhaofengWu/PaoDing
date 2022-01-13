@@ -131,13 +131,14 @@ class Dataset:
             max_length=self.hparams.max_length,
         )
 
-    def preprocess(self, dataset_dict: DatasetDict) -> DatasetDict:
+    def preprocess(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
         dataset_dict = DatasetDict(  # reimplementing DatasetDict.map to provide `split`
             {
                 split: dataset.map(
                     lambda examples: self.tokenize(examples, split),
                     batched=True,
                     num_proc=4,
+                    **(map_kwargs if map_kwargs is not None else {}),
                 )
                 for split, dataset in dataset_dict.items()
             }
