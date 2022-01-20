@@ -3,6 +3,7 @@ import os
 from typing import Callable
 
 from datasets import DatasetDict, load_dataset
+from transformers import PreTrainedTokenizerBase
 
 from paoding.data.dataset import Dataset
 
@@ -11,15 +12,16 @@ class LocalDataset(Dataset):
     def __init__(
         self,
         hparams: argparse.Namespace,
+        tokenizer: PreTrainedTokenizerBase,
         split_filename: Callable[[str], str],
         *load_args,
-        preprocess_and_save=True,
+        preprocess_and_save: bool = True,
         **load_kwargs,
     ):
         self.split_filename = split_filename
         self.load_args = load_args
         self.load_kwargs = load_kwargs
-        super().__init__(hparams, preprocess_and_save=preprocess_and_save)
+        super().__init__(hparams, tokenizer, preprocess_and_save=preprocess_and_save)
 
     def load(self) -> DatasetDict:
         dataset_dict = load_dataset(

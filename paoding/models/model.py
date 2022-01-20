@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.optim import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from transformers import get_linear_schedule_with_warmup
-from transformers import AdamW
+from transformers import AdamW, PreTrainedTokenizerBase
 
 
 class Model(pl.LightningModule):
@@ -23,8 +23,12 @@ class Model(pl.LightningModule):
         self.prepare_data()
         self.metrics = self.setup_metrics()
 
+    def setup_tokenizer(self) -> PreTrainedTokenizerBase:
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
     def prepare_data(self):
-        self.dataset = self.hparams.dataset_class(self.hparams)
+        self.tokenizer = self.setup_tokenizer()
+        self.dataset = self.hparams.dataset_class(self.hparams, self.tokenizer)
 
     def setup(self, stage: str = None):
         """To set up self.dataset_size"""

@@ -26,15 +26,20 @@ class Dataset:
     and a tokenizer.
     """
 
-    def __init__(self, hparams: argparse.Namespace, preprocess_and_save=True):
+    def __init__(
+        self,
+        hparams: argparse.Namespace,
+        tokenizer: PreTrainedTokenizerBase,
+        preprocess_and_save: bool = True,
+    ):
         """
         Input:
             preprocess_and_save: sometimes a Dataset is used as an intermediate processing step,
                 in which case no preprocessing and persistence may be necessary.
         """
         self.hparams = hparams
+        self.tokenizer = tokenizer
         if preprocess_and_save:
-            self.tokenizer = self.setup_tokenizer()
             if os.path.exists(self.cache_path):
                 logger.info(f"Reusing cache at {self.cache_path}")
                 self.dataset_dict = DatasetDict.load_from_disk(self.cache_path)
@@ -52,7 +57,7 @@ class Dataset:
     @property
     def hash_fields(self) -> list[Any]:
         """For cache purpose"""
-        return [self.hparams.seed, self.tokenizer.__repr__()]
+        return [self.hparams.seed, self.tokenizer.__repr__(), self.hparams.max_length]
 
     @property
     def cache_path(self) -> str:
@@ -150,9 +155,6 @@ class Dataset:
             del dataset_dict["validation"]
 
         return dataset_dict
-
-    def setup_tokenizer(self) -> PreTrainedTokenizerBase:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     def items(self) -> ItemsView:
         return self.dataset_dict.items()
