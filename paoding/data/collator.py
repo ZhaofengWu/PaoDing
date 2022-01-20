@@ -59,7 +59,10 @@ def collate_fn(
             label will be included in the batch. By default, the labels will NOT be padded, but if
             it needs to be padded, simply pass it as a part of pad_token_map.
     """
-    batch = [{k: np.array(v) for k, v in e.items()} for e in batch]
+    batch = [
+        {k: np.array(v) for k, v in e.items() if k in pad_token_map or k == label_key}
+        for e in batch
+    ]
     max_shapes = _find_max_shapes(batch, pad_token_map.keys())
     for i, e in enumerate(batch):
         batch[i] = {label_key: e[label_key]} | {
