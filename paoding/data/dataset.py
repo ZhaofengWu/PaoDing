@@ -100,6 +100,16 @@ class Dataset:
         return self.text_key
 
     @property
+    def output_mode(self) -> str:
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    @property
+    def num_labels(self) -> int:
+        if self.output_mode == "classification":
+            raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+        return None
+
+    @property
     def metric_names(self) -> list[str]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
@@ -113,16 +123,6 @@ class Dataset:
     @property
     def metric_watch_mode(self) -> str:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    @property
-    def output_mode(self) -> str:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
-    @property
-    def num_labels(self) -> int:
-        if self.output_mode == "classification":
-            raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-        return None
 
     def load(self) -> DatasetDict:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")

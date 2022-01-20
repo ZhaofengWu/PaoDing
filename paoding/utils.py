@@ -1,8 +1,10 @@
+import argparse
 import gc
 import logging
 import math
 from pathlib import Path
 import sys
+from typing import Generic, TypeVar, Type
 
 import torch
 
@@ -24,6 +26,36 @@ def gpu_tensors(precision=32):
 
 def add_parent_dir_to_path(file: str):
     sys.path.append(str(Path(file).parent.parent.absolute()))
+
+
+WRAPPED_CLS = TypeVar("WRAPPED_CLS")
+
+
+class Lazy(Generic[WRAPPED_CLS]):
+    """
+    Inspired by allennlp's Lazy class.
+
+    Usage:
+    ```
+    class A:
+        def __init__(self, a, b, c=1, d=2):
+            pass
+
+    lazy: Lazy[A] = Lazy(A, b, d=2)
+    instance: A = lazy(a, c=1)
+    ```
+    """
+
+    def __init__(self, wrapped_cls: Type[WRAPPED_CLS], *args, **kwargs):
+        self.wrapped_cls = wrapped_cls
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, *args, **kwargs):
+        return self.wrapped_cls(*args, *self.args, **kwargs, **self.kwargs)
+
+    def add_args(self, parser: argparse.ArgumentParser):
+        self.wrapped_cls.add_args(parser)
 
 
 class LazyLogger:
