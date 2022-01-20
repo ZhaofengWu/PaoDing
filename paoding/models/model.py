@@ -100,8 +100,15 @@ class Model(pl.LightningModule):
             # Sometimes dataset_size could be smaller than the effective_batch_size
             total_steps = max(self.dataset_size / effective_batch_size, 1) * self.hparams.epochs
 
+        if self.hparams.warmup_steps > 0 and self.hparams.warmup_ratio > 0:
+            raise ValueError("--warmup_steps and --warmup_ratio are mutually exclusive.")
+        warmup_steps = (
+            int(total_steps * self.hparams.warmup_ratio)
+            if self.hparams.warmup_ratio > 0
+            else self.hparams.warmup_steps
+        )
         scheduler = get_linear_schedule_with_warmup(
-            optimizer, num_warmup_steps=self.hparams.warmup_steps, num_training_steps=total_steps
+            optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
 
@@ -232,6 +239,7 @@ class Model(pl.LightningModule):
         parser.add_argument("--accumulate_grad_batches", default=1, type=int)
         parser.add_argument("--adam_epsilon", default=1e-8, type=float)
         parser.add_argument("--warmup_steps", default=0, type=int)
+        parser.add_argument("--warmup_ratio", default=0.0, type=float)
         parser.add_argument("--lr_scheduler_total_steps", default=None, type=int)
         parser.add_argument("--epochs", default=3, type=int)
         parser.add_argument("--batch_size", default=32, type=int)
