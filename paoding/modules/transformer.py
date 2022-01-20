@@ -44,9 +44,7 @@ class Transformer(torch.nn.Module):
             self.model = type(self.model)(self.config)
 
         if not trainable:
-            # TODO: support this
-            assert task == "base", "No support for freezing the backbone for headed tasks yet"
-            for param in self.model.parameters():
+            for param in self.model.base_model.parameters():
                 param.requires_grad = False
 
     def forward(self, *args, **kwargs):
