@@ -13,6 +13,7 @@ class HuggingfaceDataset(Dataset):
         hparams: argparse.Namespace,
         tokenizer: PreTrainedTokenizerBase,
         preprocess_and_save: bool = True,
+        tokenize_separately: bool = False,
         *,
         dataset_name: str,
         subset_name: str,
@@ -34,7 +35,12 @@ class HuggingfaceDataset(Dataset):
         self._metric_names = metric_names
         self._metric_watch_mode = metric_watch_mode
 
-        super().__init__(hparams, tokenizer, preprocess_and_save=preprocess_and_save)
+        super().__init__(
+            hparams,
+            tokenizer,
+            preprocess_and_save=preprocess_and_save,
+            tokenize_separately=tokenize_separately,
+        )
 
     @property
     def text_key(self) -> str:

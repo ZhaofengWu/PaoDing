@@ -16,12 +16,18 @@ class LocalDataset(Dataset):
         split_filename: Callable[[str], str],
         *load_args,
         preprocess_and_save: bool = True,
+        tokenize_separately: bool = False,
         **load_kwargs,
     ):
         self.split_filename = split_filename
         self.load_args = load_args
         self.load_kwargs = load_kwargs
-        super().__init__(hparams, tokenizer, preprocess_and_save=preprocess_and_save)
+        super().__init__(
+            hparams,
+            tokenizer,
+            preprocess_and_save=preprocess_and_save,
+            tokenize_separately=tokenize_separately,
+        )
 
     def load(self) -> DatasetDict:
         dataset_dict = load_dataset(

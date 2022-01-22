@@ -4,6 +4,8 @@ from transformers import PreTrainedTokenizer
 
 
 class Tokenizer(PreTrainedTokenizer):
+    model_input_names = ["input_ids", "attention_mask"]
+
     def __init__(self, **kwargs):
         super().__init__(
             padding_side="right",
@@ -45,8 +47,9 @@ class Tokenizer(PreTrainedTokenizer):
         add_special_tokens=True,
         truncation=False,
         max_length=None,
+        **kwargs,
     ) -> dict[str, Any]:
-        kwargs = dict(
+        kwargs = kwargs | dict(
             add_special_tokens=add_special_tokens, truncation=truncation, max_length=max_length
         )
         if isinstance(text, list):

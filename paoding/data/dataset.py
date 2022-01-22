@@ -31,14 +31,19 @@ class Dataset:
         hparams: argparse.Namespace,
         tokenizer: PreTrainedTokenizerBase,
         preprocess_and_save: bool = True,
+        tokenize_separately: bool = False,
     ):
         """
         Input:
             preprocess_and_save: sometimes a Dataset is used as an intermediate processing step,
                 in which case no preprocessing and persistence may be necessary.
+            tokenize_separately: if False, both sentences, if there are two, in an example will be
+                passed to the tokenizer together. Otherwise, the sentences are separately tokenized,
+                and the keys are suffixed with the (1-based) index.
         """
         self.hparams = hparams
         self.tokenizer = tokenizer
+        self.tokenize_separately = tokenize_separately
         if preprocess_and_save:
             if os.path.exists(self.cache_path):
                 logger.info(f"Reusing cache at {self.cache_path}")
@@ -127,14 +132,25 @@ class Dataset:
     def load(self) -> DatasetDict:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
+    @property
+    def tokenize_kwargs(self) -> dict[str, Any]:
+        return dict(padding=False, truncation=True, max_length=self.hparams.max_length)
+
     def tokenize(self, examples: dict[str, list], split: str) -> dict[str, list]:
-        return self.tokenizer(
-            examples[self.text_key],
-            text_pair=examples[self.second_text_key] if self.second_text_key is not None else None,
-            padding=False,  # we control this in the collator
-            truncation=True,
-            max_length=self.hparams.max_length,
-        )
+        if self.tokenize_separately:
+            output = {}
+            for i, text in enumerate((examples[self.text_key], examples[self.second_text_key])):
+                single_output = self.tokenizer(text, **self.tokenize_kwargs)
+                output.update({f"{k}_{i + 1}": v for k, v in single_output.items()})
+            return output
+        else:
+            return self.tokenizer(
+                examples[self.text_key],
+                text_pair=examples[self.second_text_key]
+                if self.second_text_key is not None
+                else None,
+                **self.tokenize_kwargs,
+            )
 
     def preprocess(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
         dataset_dict = DatasetDict(  # reimplementing DatasetDict.map to provide `split`
@@ -196,11 +212,24 @@ class Dataset:
         Specifies the padding for each key. Only keys including in this map plus the label will be
         included in the batch.
         """
-        return {
+        _pad_token_map_template = {
             "input_ids": self.tokenizer.pad_token_id,
             "attention_mask": False,
             "token_type_ids": self.tokenizer.pad_token_type_id,
         }
+        if any(k not in _pad_token_map_template for k in self.tokenizer.model_input_names):
+            missing = set(self.tokenizer.model_input_names) - set(_pad_token_map_template.keys())
+            raise KeyError(f"The padding for keys {missing} are missing.")
+
+        _pad_token_map = {
+            name: _pad_token_map_template[name] for name in self.tokenizer.model_input_names
+        }
+        if self.tokenize_separately:
+            new_pad_token_map = {}
+            for i in (1, 2):
+                new_pad_token_map.update({f"{k}_{i}": v for k, v in _pad_token_map.items()})
+            _pad_token_map = new_pad_token_map
+        return _pad_token_map
 
     def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:
         """
