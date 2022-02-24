@@ -2,7 +2,7 @@ import argparse
 from collections.abc import ItemsView
 import hashlib
 import os
-from typing import Any
+from typing import Any, Union
 
 import datasets
 from datasets import DatasetDict, Dataset as HFDataset
@@ -101,7 +101,7 @@ class Dataset:
         return "label"
 
     @property
-    def sort_key(self) -> str:
+    def sort_key(self) -> Union[str, tuple[str]]:
         return self.text_key
 
     @property
@@ -178,8 +178,11 @@ class Dataset:
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset_dict[split]
         if shuffle:
-            # LengthGroupedSampler sorts from longest to shortest; we want the reverse
-            lens = [-len(ids) for ids in dataset_split[self.sort_key]]
+            lens = [0] * len(dataset_split)
+            for k in self.sort_key if not isinstance(self.sort_key, str) else [self.sort_key]:
+                for i, v in enumerate(dataset_split[k]):
+                    # LengthGroupedSampler sorts from longest to shortest; we want the reverse
+                    lens[i] -= len(v)
             if self.hparams.gpus <= 1:
                 sampler = LengthGroupedSampler(None, batch_size, lengths=lens)
             else:
