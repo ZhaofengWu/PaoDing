@@ -26,6 +26,8 @@ setup(
         "datasets==1.12.1",
         "numpy==1.21.2",
         "pytorch-lightning==1.4.8",
+        "seaborn==0.11.2",
+        "tokenizers==0.10.3",
         "torch==1.9.1",
         "tqdm==4.62.2",
         "transformers==4.10.3",
