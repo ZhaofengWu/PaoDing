@@ -26,7 +26,7 @@ class LearnedPositionalEmbedding(nn.Embedding):
         output: (seq_len, emb_dim)
         """
         return F.embedding(
-            self.position_ids[:, : input.shape[1]] if position_ids is None else position_ids,
+            self.position_ids[: input.shape[1]] if position_ids is None else position_ids,
             self.weight,
             self.padding_idx,
             self.max_norm,
