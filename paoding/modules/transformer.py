@@ -48,7 +48,8 @@ class Transformer(torch.nn.Module):
                 param.requires_grad = False
 
     def forward(self, *args, **kwargs):
-        if "attention_mask" in kwargs:  # `transformers` doesn't take bool masks which is crazy
+        # `transformers` doesn't take bool masks which is crazy
+        if kwargs.get("attention_mask") is not None:
             kwargs["attention_mask"] = kwargs["attention_mask"].float()
         return self.model(*args, **kwargs)
 
