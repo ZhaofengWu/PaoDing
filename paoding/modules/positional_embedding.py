@@ -5,11 +5,17 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 
 
-def PositionalEmbedding(num_embeddings: int, embedding_dim: int, learned: bool = False):
+def PositionalEmbedding(
+    num_embeddings: int, embedding_dim: int, learned: bool = False, proportional: bool = False
+):  # TODO: improve the selection of the type of positional embedding
     if learned:
-        m = LearnedPositionalEmbedding(num_embeddings, embedding_dim)
-        nn.init.normal_(m.weight, mean=0, std=embedding_dim ** -0.5)  # from fairseq
+        if proportional:
+            m = ProportionalPositionalEmbedding(num_embeddings, embedding_dim)
+        else:
+            m = LearnedPositionalEmbedding(num_embeddings, embedding_dim)
+            nn.init.normal_(m.weight, mean=0, std=embedding_dim ** -0.5)  # from fairseq
     else:
+        assert not proportional
         m = SinusoidalPositionalEmbedding(embedding_dim, init_size=num_embeddings + 1)
     return m
 
@@ -78,3 +84,22 @@ class SinusoidalPositionalEmbedding(nn.Module):
 
         positions = torch.arange(input.shape[1], device=self._float_tensor.device)
         return self.weights[positions].detach()
+
+
+class ProportionalPositionalEmbedding(nn.Module):
+    def __init__(self, num_embeddings: int, embedding_dim: int):
+        super().__init__()
+        self.num_embeddings = num_embeddings
+
+        self.register_buffer(
+            "position_ids", torch.arange(num_embeddings).unsqueeze(-1) / num_embeddings
+        )
+        self.w = nn.Linear(1, embedding_dim)
+
+    def forward(self, input: Tensor):
+        """
+        input: (bsz, seq_len)
+        output: (seq_len, emb_dim)
+        """
+        assert (input < self.num_embeddings).all()
+        return self.w(self.position_ids[: input.shape[1]])
