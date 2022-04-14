@@ -1,4 +1,6 @@
 import argparse
+from importlib import reload
+import logging
 import os
 from typing import Type
 
@@ -10,7 +12,13 @@ os.environ.pop("SLURM_JOB_NAME", None)
 
 import pytorch_lightning as pl
 
+reload(logging)
+
 from paoding.models.model import Model
+from paoding.utils import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def add_eval_args(parser: argparse.ArgumentParser):
@@ -25,13 +33,26 @@ def add_eval_args(parser: argparse.ArgumentParser):
         "--override_data_dir",
         default=None,
         type=str,
-        help="The checkpoint contains the path to the eval data, which may not exist if you are"
-        " using a model trained on a different platform. Provided this flag ovreride the data"
-        " directory.",
+        help="The checkpoint contains the path to the eval data which overrides the data directory."
+        " This is necessary, for example, when the original data path does not exist if you are"
+        " using a model trained in a different environment.",
     )
-    parser.add_argument("--split", default="dev", type=str)
+    parser.add_argument(
+        "--split",
+        default=None,
+        type=str,
+        help="A single split on which to evaluate. Takes precedence over --splits.",
+    )
+    parser.add_argument(
+        "--splits",
+        default="dev",
+        type=str,
+        choices=["dev", "test"],
+        help="Evaluate on all dev or test splits.",
+    )
     parser.add_argument("--gpus", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
+    parser.add_argument("--no_log_file", action="store_true")
 
 
 def evaluate(model_class: Type[Model], strict_load=True):
@@ -55,10 +76,35 @@ def evaluate(model_class: Type[Model], strict_load=True):
     model.freeze()
 
     trainer = pl.Trainer(gpus=hparams.gpus, default_root_dir=model.hparams.output_dir)
-    dataloader = model.dataset.dataloader(
-        hparams.split, model.hparams.eval_batch_size, shuffle=False
+    splits = getattr(model.dataset, f"{hparams.splits}_splits")
+    if hparams.split is not None:
+        splits = [hparams.split]
+    assert splits is not None
+
+    # Set by pytorch-lightning
+    local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
+    ckpt_dir = os.path.dirname(hparams.ckpt_path)
+    log_file = os.path.join(ckpt_dir, f"eval_{'_'.join(splits)}.txt")
+    if os.path.exists(log_file) and not hparams.no_log_file:
+        raise ValueError(f"Log file ({log_file}) already exists.")
+    handlers = [logging.StreamHandler()]
+    if not hparams.no_log_file:
+        handlers.append(logging.FileHandler(log_file))
+    logging.basicConfig(
+        level=logging.INFO if local_rank <= 0 else logging.WARNING,
+        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+        handlers=handlers,
+        force=True,
     )
-    trainer.test(
-        model=model,
-        dataloaders=dataloader,
-    )
+
+    for split in splits:
+        logger.info(f"Evaluating on {split=}")
+        model.current_test_split = split
+        dataloader = model.dataset.dataloader(split, model.hparams.eval_batch_size, shuffle=False)
+        results = trainer.test(
+            model=model,
+            dataloaders=dataloader,
+        )
+        logger.info(str(results))
+
+    logger.info(f"Log saved to {log_file}")

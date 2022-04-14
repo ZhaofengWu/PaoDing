@@ -160,18 +160,13 @@ class Model(pl.LightningModule):
         self,
         batch: dict[str, torch.Tensor],
         batch_idx: int,
-        mode: str,
-        dataloader_idx=0,
+        split: str,
         compute_loss=True,
     ) -> dict[str, Any]:
-        assert mode in {"dev", "test"}
-
         logits = self(batch)["logits"]
         preds = self.get_predictions(logits, batch)
         labels = batch[self.dataset.label_key]
 
-        splits = self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits
-        split = splits[dataloader_idx]
         for metric in self.metrics[split].values():
             metric(*metric.detach_tensors(preds, labels))
 
@@ -181,21 +176,16 @@ class Model(pl.LightningModule):
             else {}
         )
 
-    def eval_epoch_end(
-        self, outputs: Union[list[list[dict[str, Any]]], list[dict[str, Any]]], mode: str
-    ):
-        assert mode in {"dev", "test"}
+    def eval_epoch_end(self, splits: list[str]):
+        # We don't actually need the step outputs here, since all metrics are aggregated in
+        # self.metrics
 
-        # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
-        # so we need a check here.
-        num_splits = 1 if isinstance(outputs[0], dict) else len(outputs)
-
+        num_splits = len(splits)
         # We gather individual metrics from each dataloader and compute the average if there is
         # more than one
         if num_splits > 1:
             sums = defaultdict(int)
-        for i in range(num_splits):
-            split = (self.dataset.dev_splits if mode == "dev" else self.dataset.test_splits)[i]
+        for split in splits:
             assert split != "avg"  # reserved keyword for below
             metrics = self.get_metrics(split, reset=True)
             for k, v in metrics.items():
@@ -218,18 +208,28 @@ class Model(pl.LightningModule):
     def validation_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int, dataloader_idx=0
     ) -> dict[str, Any]:
-        return self.eval_step(batch, batch_idx, "dev", dataloader_idx=dataloader_idx)
+        return self.eval_step(batch, batch_idx, self.dataset.dev_splits[dataloader_idx])
 
-    def validation_epoch_end(self, outputs: list[dict[str, Any]]):
-        return self.eval_epoch_end(outputs, "dev")
+    def validation_epoch_end(
+        self, outputs: Union[list[list[dict[str, Any]]], list[dict[str, Any]]]
+    ):
+        # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
+        # so we need a check here.
+        assert len(self.dataset.dev_splits) == (1 if isinstance(outputs[0], dict) else len(outputs))
+        self.eval_epoch_end(self.dataset.dev_splits)
 
     def test_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int, dataloader_idx=0
     ) -> dict[str, Any]:
-        return self.eval_step(batch, batch_idx, "test", dataloader_idx=dataloader_idx)
+        # self.current_eval_split is set in evaluate.py
+        return self.eval_step(batch, batch_idx, self.current_test_split)
 
     def test_epoch_end(self, outputs: list[dict[str, Any]]):
-        return self.eval_epoch_end(outputs, "test")
+        # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
+        # so the first element is a dict iff there's only one split
+        assert isinstance(outputs[0], dict)
+        # self.current_eval_split is set in evaluate.py
+        self.eval_epoch_end([self.current_test_split])
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
