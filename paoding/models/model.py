@@ -44,7 +44,9 @@ class Model(pl.LightningModule):
     def setup_metrics(self) -> dict[str, dict[str, Metric]]:
         return {
             split: {name: Metric.by_name(name)() for name in self.dataset.metric_names}
-            for split in self.dataset.dev_splits + self.dataset.test_splits
+            for split in (
+                [self.dataset.train_split] + self.dataset.dev_splits + self.dataset.test_splits
+            )
         }
 
     def train_dataloader(self) -> DataLoader:

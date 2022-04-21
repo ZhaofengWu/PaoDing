@@ -47,8 +47,8 @@ def add_eval_args(parser: argparse.ArgumentParser):
         "--splits",
         default="dev",
         type=str,
-        choices=["dev", "test"],
-        help="Evaluate on all dev or test splits.",
+        choices=["train", "dev", "test"],
+        help="Evaluate on the train split or all dev or test splits.",
     )
     parser.add_argument("--gpus", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
@@ -76,7 +76,10 @@ def evaluate(model_class: Type[Model], strict_load=True):
     model.freeze()
 
     trainer = pl.Trainer(gpus=hparams.gpus, default_root_dir=model.hparams.output_dir)
-    splits = getattr(model.dataset, f"{hparams.splits}_splits")
+    if hparams.splits == "train":
+        splits = [model.dataset.train_split]
+    else:
+        splits = getattr(model.dataset, f"{hparams.splits}_splits")
     if hparams.split is not None:
         splits = [hparams.split]
     assert splits is not None
