@@ -107,4 +107,5 @@ def evaluate(model_class: Type[Model], strict_load=True):
         )
         logger.info(str(results))
 
-    logger.info(f"Log saved to {log_file}")
+    if not hparams.no_log_file:
+        logger.info(f"Log saved to {log_file}")
