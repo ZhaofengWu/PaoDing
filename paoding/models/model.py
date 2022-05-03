@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Any, Union
 
 from allennlp.training.metrics import Metric
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -172,22 +173,29 @@ class Model(pl.LightningModule):
         for metric in self.metrics[split].values():
             metric(*metric.detach_tensors(preds, labels))
 
-        return (
+        loss_dict = (
             {"loss": self.compute_loss(logits, labels, batch.get("label_mask")).detach().cpu()}
             if compute_loss
             else {}
         )
+        return loss_dict | {
+            "preds": preds.detach().cpu().numpy(),
+            "labels": labels.detach().cpu().numpy(),
+        }
 
-    def eval_epoch_end(self, splits: list[str]):
-        # We don't actually need the step outputs here, since all metrics are aggregated in
-        # self.metrics
+    def eval_epoch_end(self, splits: list[str], outputs: list[list[dict[str, Any]]], set_preds_labels=False):
+        def safe_setattr(obj, k, v):
+            assert not hasattr(obj, k)
+            setattr(obj, k, v)
 
         num_splits = len(splits)
         # We gather individual metrics from each dataloader and compute the average if there is
         # more than one
         if num_splits > 1:
             sums = defaultdict(int)
-        for split in splits:
+
+        assert len(splits) == len(outputs)
+        for split, split_outputs in zip(splits, outputs):
             assert split != "avg"  # reserved keyword for below
             metrics = self.get_metrics(split, reset=True)
             for k, v in metrics.items():
@@ -196,6 +204,14 @@ class Model(pl.LightningModule):
                     sums[k] += v
                 else:
                     self.log(k, v)
+
+            if set_preds_labels:
+                assert num_splits == 1  # set_preds_labels iff testing iff only one split
+                preds = np.concatenate([output["preds"] for output in split_outputs], axis=0)
+                labels = np.concatenate([output["labels"] for output in split_outputs], axis=0)
+                # Hack: see https://github.com/PyTorchLightning/pytorch-lightning/issues/12969
+                safe_setattr(self, "_preds", preds)
+                safe_setattr(self, "_labels", labels)
         if num_splits > 1:
             for k, v in sums.items():
                 self.log(f"{k}_avg", v / num_splits)
@@ -217,8 +233,9 @@ class Model(pl.LightningModule):
     ):
         # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
         # so we need a check here.
-        assert len(self.dataset.dev_splits) == (1 if isinstance(outputs[0], dict) else len(outputs))
-        self.eval_epoch_end(self.dataset.dev_splits)
+        self.eval_epoch_end(
+            self.dataset.dev_splits, [outputs] if isinstance(outputs[0], dict) else outputs
+        )
 
     def test_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int, dataloader_idx=0
@@ -231,7 +248,7 @@ class Model(pl.LightningModule):
         # so the first element is a dict iff there's only one split
         assert isinstance(outputs[0], dict)
         # self.current_eval_split is set in evaluate.py
-        self.eval_epoch_end([self.current_test_split])
+        self.eval_epoch_end([self.current_test_split], [outputs], set_preds_labels=True)
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):

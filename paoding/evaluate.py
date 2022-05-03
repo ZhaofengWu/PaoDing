@@ -14,6 +14,7 @@ import pytorch_lightning as pl
 
 reload(logging)
 
+from paoding.analysis import add_analysis_args, analyze
 from paoding.models.model import Model
 from paoding.utils import get_logger
 
@@ -54,6 +55,7 @@ def add_eval_args(parser: argparse.ArgumentParser):
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--no_log_file", action="store_true")
 
+    add_analysis_args(parser)
 
 def evaluate(model_class: Type[Model], strict_load=True):
     parser = argparse.ArgumentParser()
@@ -109,6 +111,10 @@ def evaluate(model_class: Type[Model], strict_load=True):
             dataloaders=dataloader,
         )
         logger.info(str(results))
+        analyze(hparams, model._labels, model._preds)
+        # For safety:
+        del model._labels
+        del model._preds
 
     if not hparams.no_log_file:
         logger.info(f"Log saved to {log_file}")
