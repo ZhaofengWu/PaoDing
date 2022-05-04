@@ -57,7 +57,8 @@ def add_eval_args(parser: argparse.ArgumentParser):
 
     add_analysis_args(parser)
 
-def evaluate(model_class: Type[Model], strict_load=True):
+
+def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True):
     parser = argparse.ArgumentParser()
     add_eval_args(parser)
     hparams = parser.parse_args()
@@ -74,6 +75,8 @@ def evaluate(model_class: Type[Model], strict_load=True):
         load_kwargs["data_dir"] = hparams.override_data_dir
     if hparams.batch_size is not None:
         load_kwargs["eval_batch_size"] = hparams.batch_size
+    if dataset_class is not None:
+        load_kwargs["dataset_class"] = dataset_class
     model = model_class.load_from_checkpoint(hparams.ckpt_path, strict=strict_load, **load_kwargs)
     model.freeze()
 
