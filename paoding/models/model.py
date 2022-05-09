@@ -196,10 +196,10 @@ class Model(pl.LightningModule):
 
         assert len(splits) == len(outputs)
         for split, split_outputs in zip(splits, outputs):
-            assert split != "avg"  # reserved keyword for below
             metrics = self.get_metrics(split, reset=True)
             for k, v in metrics.items():
                 if num_splits > 1:
+                    assert f"{k}_{split}" not in metrics
                     self.log(f"{k}_{split}", v)
                     sums[k] += v
                 else:
@@ -214,7 +214,9 @@ class Model(pl.LightningModule):
                 safe_setattr(self, "_labels", labels)
         if num_splits > 1:
             for k, v in sums.items():
-                self.log(f"{k}_avg", v / num_splits)
+                # It's important to keep the aggregate metric to be the original name, since it is
+                # the sort key.
+                self.log(k, v / num_splits)
 
     def get_metrics(self, split: str, reset=False) -> dict[str, Any]:
         metrics = {name: metric.get_metric() for name, metric in self.metrics[split].items()}
