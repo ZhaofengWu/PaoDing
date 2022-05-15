@@ -29,6 +29,7 @@ setup(
         "seaborn==0.11.2",
         "tokenizers==0.10.3",
         "torch==1.9.1",
+        "torchmetrics==0.5.1",
         "tqdm==4.62.2",
         "transformers==4.10.3",
     ],
