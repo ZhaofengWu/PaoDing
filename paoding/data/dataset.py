@@ -1,7 +1,9 @@
 import argparse
 from collections.abc import ItemsView
 import hashlib
+import math
 import os
+import random
 from typing import Any, Union
 
 import datasets
@@ -44,17 +46,21 @@ class Dataset:
         self.hparams = hparams
         self.tokenizer = tokenizer
         self.tokenize_separately = tokenize_separately
-        if preprocess_and_save:
-            if os.path.exists(self.cache_path):
-                logger.info(f"Reusing cache at {self.cache_path}")
-                self.dataset_dict = DatasetDict.load_from_disk(self.cache_path)
-                return
+        if preprocess_and_save and os.path.exists(self.cache_path):
+            logger.info(f"Reusing cache at {self.cache_path}")
+            self.dataset_dict = DatasetDict.load_from_disk(self.cache_path)
+        else:
+            self.dataset_dict = self.load()
+            if preprocess_and_save:
+                self.dataset_dict = self.preprocess(self.dataset_dict)
+                logger.info(f"Saving dataset cache at {self.cache_path}")
+                self.dataset_dict.save_to_disk(self.cache_path)
 
-        self.dataset_dict = self.load()
-        if preprocess_and_save:
-            self.dataset_dict = self.preprocess(self.dataset_dict)
-            logger.info(f"Saving dataset cache at {self.cache_path}")
-            self.dataset_dict.save_to_disk(self.cache_path)
+        if self.hparams.subsample_training_ratio is not None:
+            orig_size = len(self.dataset_dict[self.train_split])
+            subsampled_size = int(math.floor(orig_size * self.hparams.subsample_training_ratio))
+            indices = random.sample(range(orig_size), subsampled_size)
+            self.dataset_dict[self.train_split] = self.dataset_dict[self.train_split].select(indices)
 
     def __getitem__(self, key: str) -> HFDataset:
         return self.dataset_dict[key]
@@ -255,4 +261,10 @@ class Dataset:
             type=int,
             help="The maximum sequence length after tokenization, for both source and target."
             " Sequences longer than this will be truncated.",
+        )
+        parser.add_argument(
+            "--subsample_training_ratio",
+            default=None,
+            type=float,
+            help="If specified, the ratio at which to random subsample the training set.",
         )
