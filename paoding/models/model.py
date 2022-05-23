@@ -21,6 +21,7 @@ class Model(pl.LightningModule):
         self.save_hyperparameters(hparams)
         # pytorch-lightning calls this, but we call it ourselves here in case the __init__ of
         # children modules need dataset attributes, e.g., num_labels
+        self._data_is_prepared = False
         self.prepare_data()
         self.metrics = self.setup_metrics()
 
@@ -28,8 +29,11 @@ class Model(pl.LightningModule):
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     def prepare_data(self):
+        if self._data_is_prepared:
+            return
         self.tokenizer = self.setup_tokenizer()
         self.dataset = self.hparams.dataset_class(self.hparams, self.tokenizer)
+        self._data_is_prepared = True
 
     def setup(self, stage: str = None):
         """To set up self.dataset_size"""
