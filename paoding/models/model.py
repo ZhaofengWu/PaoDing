@@ -42,16 +42,21 @@ class Model(pl.LightningModule):
 
         # TODO: maybe simply get len(dataset) so we don't have to create a dataloader?
         self._train_dataloader = self.dataset.dataloader(
-            "train", self.hparams.batch_size, shuffle=True
+            self.dataset.train_split, self.hparams.batch_size, shuffle=True
         )
         self.dataset_size = len(self._train_dataloader.dataset)
 
     def setup_metrics(self) -> dict[str, dict[str, Metric]]:
+        metric_splits = (
+            [self.dataset.train_split]
+            + self.dataset.dev_splits
+            + self.dataset.test_splits
+            + ["aggregate"]
+        )
+        assert len(metric_splits) == len(set(metric_splits))
         return {
             split: {name: Metric.by_name(name)() for name in self.dataset.metric_names}
-            for split in (
-                [self.dataset.train_split] + self.dataset.dev_splits + self.dataset.test_splits
-            )
+            for split in metric_splits
         }
 
     def train_dataloader(self) -> DataLoader:
@@ -174,8 +179,9 @@ class Model(pl.LightningModule):
         preds = self.get_predictions(logits, batch)
         labels = batch[self.dataset.label_key]
 
-        for metric in self.metrics[split].values():
-            metric(*metric.detach_tensors(preds, labels))
+        for s in (split, "aggregate"):
+            for metric in self.metrics[s].values():
+                metric(*metric.detach_tensors(preds, labels))
 
         loss_dict = (
             {"loss": self.compute_loss(logits, labels, batch.get("label_mask")).detach().cpu()}
@@ -187,7 +193,9 @@ class Model(pl.LightningModule):
             "labels": labels.detach().cpu().numpy(),
         }
 
-    def eval_epoch_end(self, splits: list[str], outputs: list[list[dict[str, Any]]], set_preds_labels=False):
+    def eval_epoch_end(
+        self, splits: list[str], outputs: list[list[dict[str, Any]]], set_preds_labels=False
+    ):
         def safe_setattr(obj, k, v):
             assert not hasattr(obj, k)
             setattr(obj, k, v)
@@ -197,6 +205,10 @@ class Model(pl.LightningModule):
         # more than one
         if num_splits > 1:
             sums = defaultdict(int)
+
+        if set_preds_labels:
+            safe_setattr(self, "_preds", [])
+            safe_setattr(self, "_labels", [])
 
         assert len(splits) == len(outputs)
         for split, split_outputs in zip(splits, outputs):
@@ -210,17 +222,22 @@ class Model(pl.LightningModule):
                     self.log(k, v)
 
             if set_preds_labels:
-                assert num_splits == 1  # set_preds_labels iff testing iff only one split
-                preds = np.concatenate([output["preds"] for output in split_outputs], axis=0)
-                labels = np.concatenate([output["labels"] for output in split_outputs], axis=0)
                 # Hack: see https://github.com/PyTorchLightning/pytorch-lightning/issues/12969
-                safe_setattr(self, "_preds", preds)
-                safe_setattr(self, "_labels", labels)
+                self._preds.append(
+                    np.concatenate([output["preds"] for output in split_outputs], axis=0)
+                )
+                self._labels.append(
+                    np.concatenate([output["labels"] for output in split_outputs], axis=0)
+                )
+
+        agg_metrics = self.get_metrics("aggregate", reset=True)
         if num_splits > 1:
             for k, v in sums.items():
                 # It's important to keep the aggregate metric to be the original name, since it is
                 # the sort key.
                 self.log(k, v / num_splits)
+            for k, v in agg_metrics.items():
+                self.log(k + "microaggregate", v)
 
     def get_metrics(self, split: str, reset=False) -> dict[str, Any]:
         metrics = {name: metric.get_metric() for name, metric in self.metrics[split].items()}
@@ -246,15 +263,17 @@ class Model(pl.LightningModule):
     def test_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int, dataloader_idx=0
     ) -> dict[str, Any]:
-        # self.current_eval_split is set in evaluate.py
-        return self.eval_step(batch, batch_idx, self.current_test_split)
+        # self.eval_test_split is set in evaluate.py
+        return self.eval_step(batch, batch_idx, self.eval_test_splits[dataloader_idx])
 
     def test_epoch_end(self, outputs: list[dict[str, Any]]):
         # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
-        # so the first element is a dict iff there's only one split
-        assert isinstance(outputs[0], dict)
-        # self.current_eval_split is set in evaluate.py
-        self.eval_epoch_end([self.current_test_split], [outputs], set_preds_labels=True)
+        # so we need a check here.
+        self.eval_epoch_end(
+            self.eval_test_splits,
+            [outputs] if isinstance(outputs[0], dict) else outputs,
+            set_preds_labels=True,
+        )
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):

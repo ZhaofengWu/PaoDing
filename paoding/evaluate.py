@@ -106,19 +106,26 @@ def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True):
         force=True,
     )
 
-    for split in splits:
-        logger.info(f"Evaluating on {split=}")
-        model.current_test_split = split
-        dataloader = model.dataset.dataloader(split, model.hparams.eval_batch_size, shuffle=False)
-        results = trainer.test(
-            model=model,
-            dataloaders=dataloader,
-        )
-        logger.info(str(results))
-        analyze(hparams, model._labels, model._preds)
-        # For safety:
-        del model._labels
-        del model._preds
+    model.eval_test_splits = splits
+    dataloaders = [
+        model.dataset.dataloader(split, model.hparams.eval_batch_size, shuffle=False)
+        for split in splits
+    ]
+    results = trainer.test(
+        model=model,
+        dataloaders=dataloaders,
+    )
+    # pytorch-lightning weirdly includes all metrics for all dataloaders, unless we explicitly
+    # state "dataloader_idx_{i}" in a metric's key, which is cumbersome.
+    assert all(result == results[0] for result in results)
+    results = results[0]
+    logger.info(str(results))
+
+    for split, dataloader, preds, labels in zip(splits, dataloaders, model._preds, model._labels):
+        analyze(hparams, labels, preds, dataloader, split)
+    # For safety:
+    del model._labels
+    del model._preds
 
     if not hparams.no_log_file:
         logger.info(f"Log saved to {log_file}")
