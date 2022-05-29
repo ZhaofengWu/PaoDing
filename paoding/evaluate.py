@@ -81,12 +81,13 @@ def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True):
     model.freeze()
 
     trainer = pl.Trainer(gpus=hparams.gpus, default_root_dir=model.hparams.output_dir)
-    if hparams.splits == "train":
-        splits = [model.dataset.train_split]
-    else:
-        splits = getattr(model.dataset, f"{hparams.splits}_splits")
-    if hparams.split is not None:
+    if hparams.split is not None:  # this flag takes precedence
         splits = [hparams.split]
+    else:
+        if hparams.splits == "train":
+            splits = [model.dataset.train_split]
+        else:
+            splits = getattr(model.dataset, f"{hparams.splits}_splits")
     assert splits is not None
 
     # Set by pytorch-lightning
