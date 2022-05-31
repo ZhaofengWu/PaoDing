@@ -183,7 +183,8 @@ class Dataset:
 
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset_dict[split]
-        if shuffle:
+        sampler = None
+        if shuffle and not self.hparams.no_sort:  # TODO: think about this -- sorting by length will be faster for validation too; maybe when validating but not testing?
             lens = [0] * len(dataset_split)
             for k in self.sort_key if not isinstance(self.sort_key, str) else [self.sort_key]:
                 for i, v in enumerate(dataset_split[k]):
@@ -195,14 +196,14 @@ class Dataset:
                 # TODO: support this when https://github.com/huggingface/transformers/commit/1b74af76b7e5c259d1470dec9d8d68c303dea5db is released
                 # and also remove the None from above
                 raise NotImplementedError()
-        else:
-            sampler = None
+            shuffle = False  # can't specify both shuffle and smapler
+
         pad_token_map = self.pad_token_map(split)
         assert all(pad is not None for pad in pad_token_map.values())
         dataloader = DataLoader(
             dataset_split,
             batch_size=batch_size,
-            shuffle=False,
+            shuffle=shuffle,
             sampler=sampler,
             num_workers=2,
             collate_fn=lambda batch: collate_fn(
@@ -267,4 +268,7 @@ class Dataset:
             default=None,
             type=float,
             help="If specified, the ratio at which to random subsample the training set.",
+        )
+        parser.add_argument(
+            "--no_sort", action="store_true", help="Disable (approximately) sorting by length."
         )
