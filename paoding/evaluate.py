@@ -58,7 +58,7 @@ def add_eval_args(parser: argparse.ArgumentParser):
     add_analysis_args(parser)
 
 
-def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True):
+def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True) -> tuple[list, list]:
     parser = argparse.ArgumentParser()
     add_eval_args(parser)
     hparams = parser.parse_args()
@@ -121,7 +121,9 @@ def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True):
     results = results[0]
     logger.info(str(results))
 
-    for split, dataloader, preds, labels in zip(splits, dataloaders, model._preds, model._labels):
+    preds = model._preds
+    labels = model._labels
+    for split, dataloader, preds, labels in zip(splits, dataloaders, preds, labels):
         analyze(hparams, labels, preds, dataloader, split)
     # For safety:
     del model._labels
@@ -129,3 +131,5 @@ def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True):
 
     if not hparams.no_log_file:
         logger.info(f"Log saved to {log_file}")
+
+    return hparams, model, dataloaders, preds, labels
