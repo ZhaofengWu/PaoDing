@@ -14,6 +14,8 @@ from transformers import (
     AutoModelForMaskedLM,
 )
 
+from paoding.argument_parser import ArgumentParser
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +56,7 @@ class Transformer(torch.nn.Module):
         return self.model(*args, **kwargs)
 
     @staticmethod
-    def add_args(parser: argparse.ArgumentParser):
+    def add_args(parser: ArgumentParser):
         parser.add_argument(
             "--model_name_or_path",
             default=None,

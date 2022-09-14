@@ -1,4 +1,3 @@
-import argparse
 from importlib import reload
 import logging
 import os
@@ -17,6 +16,7 @@ from pytorch_lightning.utilities import rank_zero_only
 
 reload(logging)
 
+from paoding.argument_parser import ArgumentParser
 from paoding.data.dataset import Dataset
 from paoding.models.model import Model
 from paoding.utils import get_logger
@@ -83,12 +83,12 @@ def parse_meta_args(add_args_fn):
         args=extra_args,
     )
     """
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
     add_args_fn(parser)
     return parser.parse_known_args()
 
 
-def add_generic_args(parser: argparse.ArgumentParser):
+def add_generic_args(parser: ArgumentParser):
     parser.add_argument("--output_dir", default=None, type=str, required=True)
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--gpus", type=int, default=None)
@@ -98,7 +98,7 @@ def add_generic_args(parser: argparse.ArgumentParser):
 def train(
     model_class: Type[Model], dataset_class: Type[Dataset], args: list = None
 ) -> tuple[str, Any]:
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
     add_generic_args(parser)
     model_class.add_args(parser)
     dataset_class.add_args(parser)

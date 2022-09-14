@@ -12,6 +12,8 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import get_linear_schedule_with_warmup
 from transformers import AdamW, PreTrainedTokenizerBase
 
+from paoding.argument_parser import ArgumentParser
+
 
 class Model(pl.LightningModule):
     def __init__(self, hparams: Union[argparse.Namespace, dict]):
@@ -276,7 +278,7 @@ class Model(pl.LightningModule):
         )
 
     @staticmethod
-    def add_args(parser: argparse.ArgumentParser):
+    def add_args(parser: ArgumentParser):
         parser.add_argument("--lr", default=2e-5, type=float)
         parser.add_argument("--weight_decay", default=0.0, type=float)
         parser.add_argument("--clip_norm", default=0.0, type=float)

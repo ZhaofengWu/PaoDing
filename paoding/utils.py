@@ -8,6 +8,8 @@ from typing import Generic, TypeVar, Type
 
 import torch
 
+from paoding.argument_parser import ArgumentParser
+
 
 def gpu_tensors(precision=32):
     # Adapted from https://discuss.pytorch.org/t/how-to-debug-causes-of-gpu-memory-leaks/6741/3
@@ -54,7 +56,7 @@ class Lazy(Generic[WRAPPED_CLS]):
     def __call__(self, *args, **kwargs):
         return self.wrapped_cls(*args, *self.args, **kwargs, **self.kwargs)
 
-    def add_args(self, parser: argparse.ArgumentParser):
+    def add_args(self, parser: ArgumentParser):
         self.wrapped_cls.add_args(parser)
 
 

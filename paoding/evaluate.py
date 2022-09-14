@@ -1,4 +1,3 @@
-import argparse
 from importlib import reload
 import logging
 import os
@@ -15,6 +14,7 @@ import pytorch_lightning as pl
 reload(logging)
 
 from paoding.analysis import add_analysis_args, analyze
+from paoding.argument_parser import ArgumentParser
 from paoding.models.model import Model
 from paoding.utils import get_logger
 
@@ -22,7 +22,7 @@ from paoding.utils import get_logger
 logger = get_logger(__name__)
 
 
-def add_eval_args(parser: argparse.ArgumentParser):
+def add_eval_args(parser: ArgumentParser):
     parser.add_argument(
         "--ckpt_path",
         default=None,
@@ -59,7 +59,7 @@ def add_eval_args(parser: argparse.ArgumentParser):
 
 
 def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True) -> tuple[list, list]:
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
     add_eval_args(parser)
     hparams = parser.parse_args()
 

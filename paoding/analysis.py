@@ -1,4 +1,3 @@
-import argparse
 import itertools
 import os
 
@@ -6,13 +5,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
+from paoding.argument_parser import ArgumentParser
 from paoding.utils import get_logger
 
 
 logger = get_logger(__name__)
 
 
-def add_analysis_args(parser: argparse.ArgumentParser):
+def add_analysis_args(parser: ArgumentParser):
     parser.add_argument("--confusion_matrix", action="store_true")
     parser.add_argument("--log_predictions", action="store_true")
 

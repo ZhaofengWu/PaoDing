@@ -4,6 +4,7 @@ from typing import Union
 import torch
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
+from paoding.argument_parser import ArgumentParser
 from paoding.models.model import Model
 from paoding.modules.transformer import Transformer
 
@@ -22,6 +23,6 @@ class TransformerModel(Model):
         return self.transformer(**{k: v for k, v in batch.items() if k != self.dataset.label_key})
 
     @staticmethod
-    def add_args(parser: argparse.ArgumentParser):
+    def add_args(parser: ArgumentParser):
         Model.add_args(parser)
         Transformer.add_args(parser)

@@ -5,6 +5,8 @@ from allennlp.nn.util import masked_max, masked_mean, masked_softmax, weighted_s
 import torch
 from torch import nn
 
+from paoding.argument_parser import ArgumentParser
+
 logger = logging.getLogger(__name__)
 
 POOLING_MODES = {"avg", "max", "first", "last", "attn", "attn_k", "attn_v", "attn_kv"}
@@ -66,7 +68,7 @@ class Pooler(nn.Module):
             raise KeyError("Unsupported pooling mode")
 
     @staticmethod
-    def add_args(parser: argparse.ArgumentParser):
+    def add_args(parser: ArgumentParser):
         parser.add_argument(
             "--pooling_mode",
             default=None,

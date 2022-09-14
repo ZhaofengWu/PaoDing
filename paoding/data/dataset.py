@@ -12,6 +12,7 @@ from torch.utils.data.dataloader import DataLoader
 from transformers import PreTrainedTokenizerBase
 from transformers.trainer_pt_utils import LengthGroupedSampler
 
+from paoding.argument_parser import ArgumentParser
 from paoding.data.collator import collate_fn, PAD_TYPE
 from paoding.utils import get_logger
 
@@ -258,7 +259,7 @@ class Dataset:
         return batch
 
     @staticmethod
-    def add_args(parser: argparse.ArgumentParser):
+    def add_args(parser: ArgumentParser):
         parser.add_argument(
             "--data_dir",
             required=True,
