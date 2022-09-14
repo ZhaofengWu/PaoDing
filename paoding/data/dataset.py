@@ -117,7 +117,11 @@ class Dataset:
 
     @property
     def sort_key(self) -> Union[str, tuple[str]]:
-        return self.text_key
+        return (
+            "input_ids"
+            if self.second_text_key is None and self.tokenize_separately
+            else ("input_ids_1", "input_ids_2")
+        )
 
     @property
     def output_mode(self) -> str:
