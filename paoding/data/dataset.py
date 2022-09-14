@@ -119,7 +119,7 @@ class Dataset:
     def sort_key(self) -> Union[str, tuple[str]]:
         return (
             "input_ids"
-            if self.second_text_key is None and self.tokenize_separately
+            if self.second_text_key is None or not self.tokenize_separately
             else ("input_ids_1", "input_ids_2")
         )
 
