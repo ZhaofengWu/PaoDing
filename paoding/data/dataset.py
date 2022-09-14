@@ -233,8 +233,12 @@ class Dataset:
         Specifies the padding for each key. Only keys including in this map plus the label will be
         included in the batch.
         """
+        # For tokenizers that don't have a pad token id (stupid gpt2). This is a little dangerous,
+        # but should be ok if we rely on attention_mask
         _pad_token_map_template = {
-            "input_ids": self.tokenizer.pad_token_id,
+            "input_ids": self.tokenizer.pad_token_id
+            if self.tokenizer.pad_token_id is not None
+            else 0,
             "attention_mask": False,
             "token_type_ids": self.tokenizer.pad_token_type_id,
         }
