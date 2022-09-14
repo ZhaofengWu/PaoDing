@@ -60,7 +60,12 @@ class Dataset:
             orig_size = len(self.dataset_dict[self.train_split])
             subsampled_size = int(math.floor(orig_size * self.hparams.subsample_training_ratio))
             indices = random.sample(range(orig_size), subsampled_size)
-            self.dataset_dict[self.train_split] = self.dataset_dict[self.train_split].select(indices)
+            self.dataset_dict[self.train_split] = self.dataset_dict[self.train_split].select(
+                indices
+            )
+
+    def items(self) -> ItemsView:
+        return self.dataset_dict.items()
 
     def __getitem__(self, key: str) -> HFDataset:
         return self.dataset_dict[key]
@@ -177,9 +182,6 @@ class Dataset:
             del dataset_dict["validation"]
 
         return dataset_dict
-
-    def items(self) -> ItemsView:
-        return self.dataset_dict.items()
 
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset_dict[split]
