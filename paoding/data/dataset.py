@@ -56,6 +56,10 @@ class Dataset:
                 logger.info(f"Saving dataset cache at {self.cache_path}")
                 self.dataset_dict.save_to_disk(self.cache_path)
 
+        # TODO: remove
+        self.hparams.subsample_training_ratio = getattr(
+            self.hparams, "subsample_training_ratio", None
+        )
         if self.hparams.subsample_training_ratio is not None:
             orig_size = len(self.dataset_dict[self.train_split])
             subsampled_size = int(math.floor(orig_size * self.hparams.subsample_training_ratio))
