@@ -3,25 +3,26 @@ import logging
 
 from allennlp.nn.util import masked_max, masked_mean, masked_softmax, weighted_sum
 import torch
+from torch import nn
 
 logger = logging.getLogger(__name__)
 
-POOLING_MODES = {"avg", "max", "first", "last", "attn", "attn_k", "attn_kv"}
+POOLING_MODES = {"avg", "max", "first", "last", "attn", "attn_k", "attn_v", "attn_kv"}
 
 
-class Pooler(torch.nn.Module):
+class Pooler(nn.Module):
     def __init__(self, hparams: argparse.Namespace, hidden_dim: int = None):
         assert hparams.pooling_mode in POOLING_MODES
 
         super().__init__()
         self.hparams = hparams
-        if self.hparams.pooling_mode in {"attn", "attn_k", "attn_kv"}:
+        if self.hparams.pooling_mode in {"attn", "attn_k", "attn_v", "attn_kv"}:
             assert hidden_dim is not None
-            self.q = torch.nn.Linear(hidden_dim, 1, bias=False)
+            self.q = nn.Linear(hidden_dim, 1, bias=False)
             if self.hparams.pooling_mode in {"attn_k", "attn_kv"}:
-                self.K = torch.nn.Linear(hidden_dim, hidden_dim)
-            if self.hparams.pooling_mode == "attn_kv":
-                self.V = torch.nn.Linear(hidden_dim, hidden_dim)
+                self.K = nn.Linear(hidden_dim, hidden_dim)
+            if self.hparams.pooling_mode in {"attn_v", "attn_kv"}:
+                self.V = nn.Linear(hidden_dim, hidden_dim)
 
     def forward(self, tensor: torch.Tensor, mask: torch.Tensor = None):
         """
@@ -51,11 +52,11 @@ class Pooler(torch.nn.Module):
             if mask is not None:
                 last_pos = mask.sum(-1) - 1  # (bsz,)
                 return tensor[torch.arange(tensor.shape[0]), last_pos]
-        elif self.hparams.pooling_mode in {"attn", "attn_k", "attn_kv"}:
+        elif self.hparams.pooling_mode in {"attn", "attn_k", "attn_v", "attn_kv"}:
             k = v = tensor  # (bsz, seq_len, hidden_dim)
             if self.hparams.pooling_mode in {"attn_k", "attn_kv"}:
                 k = self.K(k)
-            if self.hparams.pooling_mode == "attn_kv":
+            if self.hparams.pooling_mode in {"attn_v", "attn_kv"}:
                 v = self.V(v)
             scores = self.q(k).squeeze(-1)  # (bsz, seq_len)
             # masked_softmax handles None mask automatically, and makes sure that paddings are 0
