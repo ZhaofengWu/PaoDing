@@ -158,7 +158,7 @@ class Model(pl.LightningModule):
         loss = self.compute_loss(
             self(batch)["logits"], batch[self.dataset.label_key], batch.get("label_mask")
         )
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, on_step=False, on_epoch=True)
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
         return {"loss": loss}
 
