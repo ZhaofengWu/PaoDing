@@ -1,3 +1,4 @@
+from .data.concat_dataset import ConcatDatasetMeta, ConcatDataset
 from .data.dataset import Dataset
 from .data.huggingface_dataset import HuggingfaceDataset
 from .data.local_dataset import LocalDataset
