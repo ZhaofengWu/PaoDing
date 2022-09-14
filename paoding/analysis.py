@@ -1,18 +1,27 @@
 import argparse
 import itertools
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
+from paoding.utils import get_logger
+
+
+logger = get_logger(__name__)
+
 
 def add_analysis_args(parser: argparse.ArgumentParser):
     parser.add_argument("--confusion_matrix", action="store_true")
+    parser.add_argument("--log_predictions", action="store_true")
 
 
-def analyze(hparams, labels, preds):
+def analyze(hparams, labels, preds, dataloader, split):
     if hparams.confusion_matrix:
         plot_confusion_matrix(labels, preds)
+    if hparams.log_predictions:
+        log_predictions(hparams, labels, preds, dataloader, split)
 
 
 def plot_confusion_matrix(
@@ -51,3 +60,22 @@ def plot_confusion_matrix(
     plt.show()
 
     return cm
+
+
+def log_predictions(hparams, labels, preds, dataloader, split):
+    ckpt_dir = os.path.dirname(hparams.ckpt_path)
+    pred_file = os.path.join(ckpt_dir, f"pred_{split}.txt")
+
+    assert not os.path.exists(pred_file), f"Prediction file {pred_file} exists."
+
+    with open(pred_file, "w") as f:
+        assert len(preds) == len(labels) == len(dataloader.dataset)
+        # This zip relies on we not shuffling
+        for p, l, e in zip(preds, labels, dataloader.dataset):
+            # Why not "correct"/"incorrect", you ask? Because the fact that "correct" is a substring
+            # of "incorrect" makes searching harder
+            f.write(
+                "\t".join([str(e), f"pred{p}", f"label{l}", "right" if p == l else "wrong"]) + "\n"
+            )
+
+    logger.info(f"Predictions logged to {pred_file}")
