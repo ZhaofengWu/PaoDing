@@ -39,7 +39,7 @@ def _pad(
 def _tensorize(sequence: np.ndarray, name: str, output_mode: str, label_key: str) -> torch.Tensor:
     # TODO: this can be smarter
     dtype = torch.long
-    if name == label_key and output_mode == "regression":
+    if (name == label_key and output_mode == "regression") or "embed" in name:
         dtype = torch.float
     elif "attention_mask" in name:
         dtype = torch.bool
