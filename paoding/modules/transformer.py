@@ -58,7 +58,7 @@ class Transformer(torch.nn.Module):
     @staticmethod
     def add_args(parser: ArgumentParser):
         parser.add_argument(
-            "--model_name_or_path",
+            "--model_name_or_path",  # TODO: rename this
             default=None,
             type=str,
             required=True,

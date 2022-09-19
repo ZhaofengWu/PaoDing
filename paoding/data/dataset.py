@@ -79,6 +79,7 @@ class Dataset:
     def hash_fields(self) -> list[Any]:
         """For cache purpose"""
         return [self.hparams.seed, self.tokenizer.__repr__(), self.hparams.max_length]
+        # TODO: self class name
 
     @property
     def cache_path(self) -> str:
@@ -195,10 +196,10 @@ class Dataset:
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset_dict[split]
         sampler = None
-        if shuffle and not self.hparams.no_sort:  # TODO: think about this -- sorting by length will be faster for validation too; maybe when validating but not testing?
+        if shuffle and not self.hparams.no_sort:  # TODO: think about this -- sorting by length will be faster for validation too; maybe when validating but not testing? But sorting messes up prediction logging
             lens = [0] * len(dataset_split)
             for k in self.sort_key if not isinstance(self.sort_key, str) else [self.sort_key]:
-                for i, v in enumerate(dataset_split[k]):
+                for i, v in enumerate(dataset_split[k]):  # TODO: this is a bit slow
                     # LengthGroupedSampler sorts from longest to shortest; we want the reverse
                     lens[i] -= len(v)
             if self.hparams.gpus <= 1:
