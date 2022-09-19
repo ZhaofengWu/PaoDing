@@ -65,7 +65,7 @@ def collate_fn(
     ]
     max_shapes = _find_max_shapes(batch, pad_token_map.keys())
     for i, e in enumerate(batch):
-        batch[i] = {label_key: e[label_key]} | {
+        batch[i] = ({label_key: e[label_key]} if label_key is not None else {}) | {
             k: _pad(e[k], pad_token, max_shapes[k] - np.array(e[k].shape), padding_side)
             for k, pad_token in pad_token_map.items()
         }  # dict concatenation overrides label_key if present
