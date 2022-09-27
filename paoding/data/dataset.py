@@ -276,8 +276,8 @@ class Dataset:
             "--max_length",
             default=None,
             type=int,
-            help="The maximum sequence length after tokenization, for both source and target."
-            " Sequences longer than this will be truncated.",
+            help="The maximum sequence length after tokenization. Sequences longer than this will"
+            " be truncated.",
         )
         parser.add_argument(
             "--subsample_training_ratio",
