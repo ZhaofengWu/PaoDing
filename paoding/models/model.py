@@ -239,7 +239,7 @@ class Model(pl.LightningModule):
                 # the sort key.
                 self.log(k, v / num_splits)
             for k, v in agg_metrics.items():
-                self.log(k + "microaggregate", v)
+                self.log(k + "_microaggregate", v)
 
     def get_metrics(self, split: str, reset=False) -> dict[str, Any]:
         metrics = {name: metric.get_metric() for name, metric in self.metrics[split].items()}
