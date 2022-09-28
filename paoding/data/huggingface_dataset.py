@@ -19,6 +19,9 @@ class HuggingfaceDataset(Dataset):
         dataset_name: str = None,
         subset_name: str = None,
         from_disk_path: str = None,
+        train_split: str = None,
+        dev_splits: str = None,
+        test_splits: str = None,
         text_key: str,
         second_text_key: str = None,
         label_key: str,
@@ -37,6 +40,9 @@ class HuggingfaceDataset(Dataset):
             self.dataset_name = dataset_name
             self.subset_name = subset_name
 
+        self._train_split = train_split
+        self._dev_splits = dev_splits
+        self._test_splits = test_splits
         self._text_key = text_key
         self._second_text_key = second_text_key
         self._label_key = label_key
@@ -52,6 +58,18 @@ class HuggingfaceDataset(Dataset):
             preprocess_and_save=preprocess_and_save,
             tokenize_separately=tokenize_separately,
         )
+
+    @property
+    def train_split(self) -> str:
+        return self._train_split if self._train_split is not None else super().train_split
+
+    @property
+    def dev_splits(self) -> str:
+        return self._dev_splits if self._dev_splits is not None else super().dev_splits
+
+    @property
+    def test_splits(self) -> str:
+        return self._test_splits if self._test_splits is not None else super().test_splits
 
     @property
     def text_key(self) -> str:

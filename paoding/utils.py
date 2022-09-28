@@ -1,4 +1,3 @@
-import argparse
 import gc
 import logging
 import math
@@ -58,6 +57,12 @@ class Lazy(Generic[WRAPPED_CLS]):
 
     def add_args(self, parser: ArgumentParser):
         self.wrapped_cls.add_args(parser)
+
+    def load_from_checkpoint(self, *args, **kwargs):
+        assert (
+            len(self.args) == 0
+        ), "pytorch-lightning only allows class construction in load_from_checkpoint to take kwargs"
+        return self.wrapped_cls.load_from_checkpoint(*args, **(kwargs | self.kwargs))
 
 
 class LazyLogger:

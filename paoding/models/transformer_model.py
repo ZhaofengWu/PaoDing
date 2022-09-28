@@ -16,7 +16,7 @@ class TransformerModel(Model):
         super().__init__(hparams)
         if "num_labels" not in config_kwargs:
             config_kwargs["num_labels"] = self.dataset.num_labels
-        self.transformer = Transformer(hparams, task, trainable=trainable, **config_kwargs)
+        self.transformer = Transformer(self.hparams, task, trainable=trainable, **config_kwargs)
 
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
         return AutoTokenizer.from_pretrained(self.hparams.model_name_or_path)

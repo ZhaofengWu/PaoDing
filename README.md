@@ -4,6 +4,16 @@ An opiniated NLP-oriented PyTorch wrapper that makes your life easier. It is in 
 
 NB: if you want to use this library for development, it might be easier to `pip install -e .` from source, so that you can put breakpoints anywhere.
 
+## Examples
+
+The below examples trains and evaluate on MNLI. In our environment, it achieves 86.5%/86.6% accuracy on MNLI matched/mismatched dev sets.
+
+```bash
+mkdir data_cache
+python examples/train_sequence_classification.py --data_dir data_cache --model_name_or_path bert-large-cased --batch_size 32 --max_length 256 --lr 0.00001 --warmup_ratio 0.06 --epochs 3 --clip_norm 1.0 --output_dir mnli
+python examples/evaluate.py --ckpt_path mnli/best.ckpt
+```
+
 ## Etymology
 
 Pao Ding (庖丁) is a character in the classic ancient Chinese text [Zhuangzi](https://en.wikipedia.org/wiki/Zhuangzi_(book)), published around the 3rd century BC. Pao (庖) means cook, his occupation, and Ding (丁) is his name.

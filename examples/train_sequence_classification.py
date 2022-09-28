@@ -3,16 +3,19 @@ from paoding import HuggingfaceDataset, TransformerModel, Lazy
 
 
 if __name__ == "__main__":
-    model_cls = Lazy(TransformerModel, "sequence-classification")
+    model_cls = Lazy(TransformerModel, task="sequence-classification")
     dataset_cls = Lazy(
         HuggingfaceDataset,
         dataset_name="glue",
-        subset_name="rte",
-        text_key="sentence1",
-        second_text_key="sentence2",
+        subset_name="mnli",
+        # {dev, test}_splits are optional if they are called {"dev", "test"}
+        dev_splits=["validation_matched", "validation_mismatched"],
+        test_splits=["test_matched", "test_mismatched"],
+        text_key="premise",
+        second_text_key="hypothesis",
         label_key="label",
         output_mode="classification",
-        num_labels=2,
+        num_labels=3,
         metric_names=["boolean_accuracy"],
         metric_watch_mode="max",
     )
