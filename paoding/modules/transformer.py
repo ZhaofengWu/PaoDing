@@ -5,13 +5,13 @@ import torch
 from transformers import (
     AutoConfig,
     AutoModel,
-    AutoModelForPreTraining,
-    AutoModelForQuestionAnswering,
-    AutoModelForSeq2SeqLM,
+    # AutoModelForPreTraining,
+    # AutoModelForQuestionAnswering,
+    # AutoModelForSeq2SeqLM,
     AutoModelForSequenceClassification,
-    AutoModelForTokenClassification,
-    AutoModelForCausalLM,
-    AutoModelForMaskedLM,
+    # AutoModelForTokenClassification,
+    # AutoModelForCausalLM,
+    # AutoModelForMaskedLM,
 )
 
 from paoding.argument_parser import ArgumentParser
@@ -23,13 +23,14 @@ logger = logging.getLogger(__name__)
 TASKS = {
     "base": AutoModel,
     "sequence-classification": AutoModelForSequenceClassification,
-    "question-answering": AutoModelForQuestionAnswering,
-    "pretraining": AutoModelForPreTraining,
-    "token-classification": AutoModelForTokenClassification,
-    "masked-lm": AutoModelForMaskedLM,
-    "causal-lm": AutoModelForCausalLM,
-    "summarization": AutoModelForSeq2SeqLM,
-    "translation": AutoModelForSeq2SeqLM,
+    # The below tasks haven't been tested. Uncomment and test when needed.
+    # "question-answering": AutoModelForQuestionAnswering,
+    # "pretraining": AutoModelForPreTraining,
+    # "token-classification": AutoModelForTokenClassification,
+    # "masked-lm": AutoModelForMaskedLM,
+    # "causal-lm": AutoModelForCausalLM,
+    # "summarization": AutoModelForSeq2SeqLM,
+    # "translation": AutoModelForSeq2SeqLM,
 }
 
 
