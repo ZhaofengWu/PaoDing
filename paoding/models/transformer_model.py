@@ -14,6 +14,8 @@ class TransformerModel(Model):
         self, hparams: Union[argparse.Namespace, dict], task: str, trainable=True, **config_kwargs
     ):
         super().__init__(hparams)
+        if "num_labels" not in config_kwargs:
+            config_kwargs["num_labels"] = self.dataset.num_labels
         self.transformer = Transformer(hparams, task, trainable=trainable, **config_kwargs)
 
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
