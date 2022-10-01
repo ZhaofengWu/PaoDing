@@ -1,11 +1,11 @@
 import argparse
 import logging
 
-from allennlp.nn.util import masked_max, masked_mean, masked_softmax, weighted_sum
 import torch
 from torch import nn
 
 from paoding.argument_parser import ArgumentParser
+from paoding.nn_utils import masked_max, masked_mean, masked_softmax, weighted_sum
 
 logger = logging.getLogger(__name__)
 
