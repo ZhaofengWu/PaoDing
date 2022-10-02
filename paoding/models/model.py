@@ -2,13 +2,14 @@ import argparse
 from collections import defaultdict
 from typing import Any, Union
 
-from allennlp.training.metrics import Metric
 import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from torch.optim import Optimizer
 from torch.utils.data.dataloader import DataLoader
+import torchmetrics
+from torchmetrics import Metric
 from transformers import get_linear_schedule_with_warmup
 from transformers import AdamW, PreTrainedTokenizerBase
 
@@ -56,8 +57,14 @@ class Model(pl.LightningModule):
             + ["aggregate"]
         )
         assert len(metric_splits) == len(set(metric_splits))
+        metric_init_kwargs = {}
+        if self.dataset.output_mode == "classification":
+            metric_init_kwargs["num_classes"] = self.dataset.num_labels
         return {
-            split: {name: Metric.by_name(name)() for name in self.dataset.metric_names}
+            split: {
+                name: getattr(torchmetrics, name)(**metric_init_kwargs)
+                for name in self.dataset.metric_names
+            }
             for split in metric_splits
         }
 
@@ -183,7 +190,7 @@ class Model(pl.LightningModule):
 
         for s in (split, "aggregate"):
             for metric in self.metrics[s].values():
-                metric(*metric.detach_tensors(preds, labels))
+                metric(preds.detach(), labels.detach())
 
         loss_dict = (
             {"loss": self.compute_loss(logits, labels, batch.get("label_mask")).detach().cpu()}
@@ -242,7 +249,7 @@ class Model(pl.LightningModule):
                 self.log(k + "_microaggregate", v)
 
     def get_metrics(self, split: str, reset=False) -> dict[str, Any]:
-        metrics = {name: metric.get_metric() for name, metric in self.metrics[split].items()}
+        metrics = {name: metric.compute() for name, metric in self.metrics[split].items()}
         if reset:
             for metric in self.metrics[split].values():
                 metric.reset()

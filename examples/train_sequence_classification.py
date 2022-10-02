@@ -16,7 +16,7 @@ if __name__ == "__main__":
         label_key="label",
         output_mode="classification",
         num_labels=3,
-        metric_names=["boolean_accuracy"],
+        metric_names=["Accuracy"],
         metric_watch_mode="max",
     )
     train(model_cls, dataset_cls)
