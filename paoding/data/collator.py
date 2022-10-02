@@ -5,6 +5,7 @@ import torch
 from torch.utils.data._utils.collate import default_collate
 
 PAD_TYPE = Union[int, float, bool]
+BATCH_INFO = dict[str, tuple[torch.dtype, PAD_TYPE]]
 
 
 def _find_max_shapes(
@@ -37,26 +38,16 @@ def _pad(
 
 
 def collate_fn(
-    batch: list[dict[str, list]],
-    label_key: str,
-    pad_token_map: dict[str, PAD_TYPE],
-    padding_side: str,
+    batch: list[dict[str, list]], batch_info: BATCH_INFO, padding_side: str
 ) -> dict[str, torch.Tensor]:
-    """
-    Input:
-        pad_token_map: specifies the padding for each key. Only keys including in this map plus the
-            label will be included in the batch. By default, the labels will NOT be padded, but if
-            it needs to be padded, simply pass it as a part of pad_token_map.
-    """
-    batch = [
-        {k: np.array(v) for k, v in e.items() if k in pad_token_map or k == label_key}
-        for e in batch
-    ]
-    max_shapes = _find_max_shapes(batch, pad_token_map.keys())
+    to_pad_keys = {k for k, (dtype, pad) in batch_info.items() if pad is not None}
+    batch = [{k: np.array(v) for k, v in e.items() if k in batch_info} for e in batch]
+    max_shapes = _find_max_shapes(batch, to_pad_keys)
     for i, e in enumerate(batch):
-        batch[i] = ({label_key: e[label_key]} if label_key is not None else {}) | {
-            k: _pad(e[k], pad_token, max_shapes[k] - np.array(e[k].shape), padding_side)
-            for k, pad_token in pad_token_map.items()
-        }  # dict concatenation overrides label_key if present
-        batch[i] = {k: torch.tensor(v) for k, v in batch[i].items()}
+        batch[i] = {}
+        for k, (dtype, pad_value) in batch_info.items():
+            v = e[k]
+            if pad_value is not None:
+                v = _pad(v, pad_value, max_shapes[k] - np.array(v.shape), padding_side)
+            batch[i][k] = torch.tensor(v, dtype=dtype)
     return default_collate(batch)

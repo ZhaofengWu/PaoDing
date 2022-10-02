@@ -4,6 +4,7 @@ import hashlib
 import math
 import os
 import random
+import torch
 from typing import Any, Union
 
 import datasets
@@ -13,7 +14,7 @@ from transformers import PreTrainedTokenizerBase
 from transformers.trainer_pt_utils import LengthGroupedSampler, DistributedLengthGroupedSampler
 
 from paoding.argument_parser import ArgumentParser
-from paoding.data.collator import collate_fn, PAD_TYPE
+from paoding.data.collator import collate_fn, PAD_TYPE, BATCH_INFO
 from paoding.utils import get_logger
 
 # Sometimes we want to change the implementation of methods, etc., which cache ignores.
@@ -209,8 +210,7 @@ class Dataset:
                 sampler = DistributedLengthGroupedSampler(batch_size, lengths=lens)
             shuffle = False  # can't specify both shuffle and smapler
 
-        pad_token_map = self.pad_token_map(split)
-        assert all(pad is not None for pad in pad_token_map.values())
+        batch_info = self.batch_info(split)
         dataloader = DataLoader(
             dataset_split,
             batch_size=batch_size,
@@ -218,42 +218,44 @@ class Dataset:
             sampler=sampler,
             num_workers=2,
             collate_fn=lambda batch: collate_fn(
-                self.before_collation(batch),
-                self.label_key,
-                pad_token_map,
-                self.tokenizer.padding_side,
+                self.before_collation(batch), batch_info, self.tokenizer.padding_side
             ),
             pin_memory=True,
         )
         return dataloader
 
-    def pad_token_map(self, split: str) -> dict[str, PAD_TYPE]:
+    def batch_info(self, split: str) -> BATCH_INFO:
         """
-        Specifies the padding for each key. Only keys including in this map plus the label will be
-        included in the batch.
+        Specifies the fields to be included in a batch, and their types and padding values. A None
+        padding value means no padding, and collation will complain if the batch contains examples
+        with different shapes.
         """
-        # For tokenizers that don't have a pad token id (stupid gpt2). This is a little dangerous,
-        # but should be ok if we rely on attention_mask
-        _pad_token_map_template = {
-            "input_ids": self.tokenizer.pad_token_id
-            if self.tokenizer.pad_token_id is not None
-            else 0,
-            "attention_mask": False,
-            "token_type_ids": self.tokenizer.pad_token_type_id,
+        known_tokenizer_fields = {  # fields we know how to handle
+            "input_ids": (
+                torch.long,
+                # Separate check for tokenizers that don't have a pad token id (stupid gpt2).
+                # This is a little dangerous, but should be ok if we rely on attention_mask.
+                self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0,
+            ),
+            "attention_mask": (torch.bool, False),
+            "token_type_ids": (torch.long, self.tokenizer.pad_token_type_id),
         }
-        if any(k not in _pad_token_map_template for k in self.tokenizer.model_input_names):
-            missing = set(self.tokenizer.model_input_names) - set(_pad_token_map_template.keys())
-            raise KeyError(f"The padding for keys {missing} are missing.")
+        if any(k not in known_tokenizer_fields for k in self.tokenizer.model_input_names):
+            missing = set(self.tokenizer.model_input_names) - set(known_tokenizer_fields.keys())
+            raise KeyError(f"Don't know how to handle batch keys {missing}.")
 
-        _pad_token_map = {
-            name: _pad_token_map_template[name] for name in self.tokenizer.model_input_names
+        batch_info = {
+            name: known_tokenizer_fields[name] for name in self.tokenizer.model_input_names
         }
         if self.tokenize_separately:
-            new_pad_token_map = {}
+            new_batch_info = {}
             for i in (1, 2):
-                new_pad_token_map.update({f"{k}_{i}": v for k, v in _pad_token_map.items()})
-            _pad_token_map = new_pad_token_map
-        return _pad_token_map
+                new_batch_info.update({f"{k}_{i}": v for k, v in batch_info.items()})
+            batch_info = new_batch_info
+
+        label_dtype = torch.float if self.output_mode == "regression" else torch.long
+        batch_info.update({self.label_key: (label_dtype, None)})
+        return batch_info
 
     def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:
         """
