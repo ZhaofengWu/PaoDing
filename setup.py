@@ -36,5 +36,5 @@ setup(
         "tqdm==4.62.2",
         "transformers==4.10.3",
     ],
-    python_requires=">=3.9.0",
+    python_requires=">=3.10.0",
 )

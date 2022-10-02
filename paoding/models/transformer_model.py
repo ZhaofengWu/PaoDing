@@ -1,5 +1,4 @@
 import argparse
-from typing import Union
 
 import torch
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
@@ -11,7 +10,7 @@ from paoding.modules.transformer import Transformer
 
 class TransformerModel(Model):
     def __init__(
-        self, hparams: Union[argparse.Namespace, dict], task: str, trainable=True, **config_kwargs
+        self, hparams: argparse.Namespace | dict, task: str, trainable=True, **config_kwargs
     ):
         super().__init__(hparams)
         if "num_labels" not in config_kwargs:

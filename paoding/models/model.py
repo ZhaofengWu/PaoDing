@@ -1,6 +1,6 @@
 import argparse
 from collections import defaultdict
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 import pytorch_lightning as pl
@@ -17,7 +17,7 @@ from paoding.argument_parser import ArgumentParser
 
 
 class Model(pl.LightningModule):
-    def __init__(self, hparams: Union[argparse.Namespace, dict]):
+    def __init__(self, hparams: argparse.Namespace | dict):
         super().__init__()
         if isinstance(hparams, dict):
             hparams = argparse.Namespace(**hparams)
@@ -145,20 +145,21 @@ class Model(pl.LightningModule):
     def compute_loss(
         self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
     ) -> torch.Tensor:
-        if self.dataset.output_mode == "classification":
-            loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))
-        elif self.dataset.output_mode == "token_classification":
-            assert mask.any(dim=-1).all()
-            loss = F.cross_entropy(
-                logits.view(-1, logits.shape[-1]), labels.view(-1), reduction="none"
-            )
-            loss = loss.view_as(labels) * mask
-            if reduce:
-                loss = loss.sum() / mask.sum()
-        elif self.dataset.output_mode == "regression":
-            loss = F.mse_loss(logits.view(-1), labels.view(-1))
-        else:
-            raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
+        match self.dataset.output_mode:
+            case "classification":
+                loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))
+            case "token_classification":
+                assert mask.any(dim=-1).all()
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.shape[-1]), labels.view(-1), reduction="none"
+                )
+                loss = loss.view_as(labels) * mask
+                if reduce:
+                    loss = loss.sum() / mask.sum()
+            case "regression":
+                loss = F.mse_loss(logits.view(-1), labels.view(-1))
+            case _:
+                raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, Any]:
@@ -170,12 +171,13 @@ class Model(pl.LightningModule):
         return {"loss": loss}
 
     def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        if self.dataset.output_mode in ("classification", "token_classification"):
-            return logits.argmax(dim=-1)
-        elif self.dataset.output_mode == "regression":
-            return logits.squeeze(dim=-1)
-        else:
-            raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
+        match self.dataset.output_mode:
+            case "classification" | "token_classification":
+                return logits.argmax(dim=-1)
+            case "regression":
+                return logits.squeeze(dim=-1)
+            case _:
+                raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
 
     def eval_step(
         self,
@@ -219,8 +221,7 @@ class Model(pl.LightningModule):
             safe_setattr(self, "_preds", [])
             safe_setattr(self, "_labels", [])
 
-        assert len(splits) == len(outputs)
-        for split, split_outputs in zip(splits, outputs):
+        for split, split_outputs in zip(splits, outputs, strict=True):
             metrics = self.get_metrics(split, reset=True)
             for k, v in metrics.items():
                 if num_splits > 1:
@@ -261,7 +262,7 @@ class Model(pl.LightningModule):
         return self.eval_step(batch, batch_idx, self.dataset.dev_splits[dataloader_idx])
 
     def validation_epoch_end(
-        self, outputs: Union[list[list[dict[str, Any]]], list[dict[str, Any]]]
+        self, outputs: list[list[dict[str, Any]]] | list[dict[str, Any]]
     ):
         # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
         # so we need a check here.

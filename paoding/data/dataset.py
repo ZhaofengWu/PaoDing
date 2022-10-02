@@ -5,7 +5,7 @@ import math
 import os
 import random
 import torch
-from typing import Any, Union
+from typing import Any
 
 import datasets
 from datasets import DatasetDict, Dataset as HFDataset
@@ -135,7 +135,7 @@ class Dataset:
         return "label"
 
     @property
-    def sort_key(self) -> Union[str, tuple[str]]:
+    def sort_key(self) -> str | tuple[str, str]:
         return (
             "input_ids"
             if self.second_text_key is None or not self.tokenize_separately

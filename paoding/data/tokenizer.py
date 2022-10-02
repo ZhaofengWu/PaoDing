@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any
 
 from transformers import PreTrainedTokenizer
 
@@ -43,7 +43,7 @@ class Tokenizer(PreTrainedTokenizer):
 
     def __call__(
         self,
-        text: Union[str, list[str]],
+        text: str | list[str],
         add_special_tokens=True,
         truncation=False,
         max_length=None,

@@ -1,11 +1,11 @@
-from typing import Iterable, Union
+from typing import Iterable, TypeAlias
 
 import numpy as np
 import torch
 from torch.utils.data._utils.collate import default_collate
 
-PAD_TYPE = Union[int, float, bool]
-BATCH_INFO = dict[str, tuple[torch.dtype, PAD_TYPE]]
+PAD_TYPE: TypeAlias = int | float | bool
+BATCH_INFO: TypeAlias = dict[str, tuple[torch.dtype, PAD_TYPE]]
 
 
 def _find_max_shapes(

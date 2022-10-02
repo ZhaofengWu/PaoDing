@@ -123,7 +123,7 @@ def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True) -> 
 
     preds = model._preds
     labels = model._labels
-    for split, dataloader, preds, labels in zip(splits, dataloaders, preds, labels):
+    for split, dataloader, preds, labels in zip(splits, dataloaders, preds, labels, strict=True):
         analyze(hparams, labels, preds, dataloader, split)
     # For safety:
     del model._labels

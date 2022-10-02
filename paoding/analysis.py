@@ -69,9 +69,8 @@ def log_predictions(hparams, labels, preds, dataloader, split):
     assert not os.path.exists(pred_file), f"Prediction file {pred_file} exists."
 
     with open(pred_file, "w") as f:
-        assert len(preds) == len(labels) == len(dataloader.dataset)
         # This zip relies on we not shuffling
-        for p, l, e in zip(preds, labels, dataloader.dataset):
+        for p, l, e in zip(preds, labels, dataloader.dataset, strict=True):
             # Why not "correct"/"incorrect", you ask? Because the fact that "correct" is a substring
             # of "incorrect" makes searching harder
             f.write(

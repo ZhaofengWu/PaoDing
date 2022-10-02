@@ -1,5 +1,4 @@
 import argparse
-from typing import Union
 
 import datasets
 from datasets import DatasetDict
@@ -25,7 +24,7 @@ class HuggingfaceDataset(Dataset):
         text_key: str,
         second_text_key: str = None,
         label_key: str,
-        sort_key: Union[str, tuple[str]] = None,
+        sort_key: str | tuple[str, str] = None,
         output_mode: str,
         num_labels: int = None,
         metric_names: list[str],
@@ -86,7 +85,7 @@ class HuggingfaceDataset(Dataset):
         return self._label_key
 
     @property
-    def sort_key(self) -> Union[str, tuple[str]]:
+    def sort_key(self) -> str | tuple[str, str]:
         return self._sort_key if self._sort_key is not None else super().sort_key
 
     @property
