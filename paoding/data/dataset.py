@@ -224,7 +224,6 @@ class Dataset:
                 self.label_key,
                 pad_token_map,
                 self.tokenizer.padding_side,
-                self.output_mode,
             ),
             pin_memory=True,
         )

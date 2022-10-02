@@ -36,22 +36,11 @@ def _pad(
     return np.pad(sequence, padding, constant_values=padding_token)
 
 
-def _tensorize(sequence: np.ndarray, name: str, output_mode: str, label_key: str) -> torch.Tensor:
-    # TODO: this can be smarter
-    dtype = torch.long
-    if (name == label_key and output_mode == "regression") or "embed" in name:
-        dtype = torch.float
-    elif "attention_mask" in name:
-        dtype = torch.bool
-    return torch.tensor(sequence, dtype=dtype)
-
-
 def collate_fn(
     batch: list[dict[str, list]],
     label_key: str,
     pad_token_map: dict[str, PAD_TYPE],
     padding_side: str,
-    output_mode: str,
 ) -> dict[str, torch.Tensor]:
     """
     Input:
@@ -69,5 +58,5 @@ def collate_fn(
             k: _pad(e[k], pad_token, max_shapes[k] - np.array(e[k].shape), padding_side)
             for k, pad_token in pad_token_map.items()
         }  # dict concatenation overrides label_key if present
-        batch[i] = {k: _tensorize(v, k, output_mode, label_key) for k, v in batch[i].items()}
+        batch[i] = {k: torch.tensor(v) for k, v in batch[i].items()}
     return default_collate(batch)
