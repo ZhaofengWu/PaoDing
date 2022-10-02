@@ -10,7 +10,7 @@ import datasets
 from datasets import DatasetDict, Dataset as HFDataset
 from torch.utils.data.dataloader import DataLoader
 from transformers import PreTrainedTokenizerBase
-from transformers.trainer_pt_utils import LengthGroupedSampler
+from transformers.trainer_pt_utils import LengthGroupedSampler, DistributedLengthGroupedSampler
 
 from paoding.argument_parser import ArgumentParser
 from paoding.data.collator import collate_fn, PAD_TYPE
@@ -204,11 +204,9 @@ class Dataset:
                     # LengthGroupedSampler sorts from longest to shortest; we want the reverse
                     lens[i] -= len(v)
             if self.hparams.gpus <= 1:
-                sampler = LengthGroupedSampler(None, batch_size, lengths=lens)
+                sampler = LengthGroupedSampler(batch_size, lengths=lens)
             else:
-                # TODO: support this when https://github.com/huggingface/transformers/commit/1b74af76b7e5c259d1470dec9d8d68c303dea5db is released
-                # and also remove the None from above
-                raise NotImplementedError()
+                sampler = DistributedLengthGroupedSampler(batch_size, lengths=lens)
             shuffle = False  # can't specify both shuffle and smapler
 
         pad_token_map = self.pad_token_map(split)
