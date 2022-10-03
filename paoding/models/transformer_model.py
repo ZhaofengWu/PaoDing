@@ -18,7 +18,7 @@ class TransformerModel(Model):
         self.transformer = Transformer(self.hparams, task, trainable=trainable, **config_kwargs)
 
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
-        return AutoTokenizer.from_pretrained(self.hparams.model_name_or_path)
+        return AutoTokenizer.from_pretrained(self.hparams.transformer_model)
 
     def forward(self, batch: dict[str, torch.Tensor]):
         return self.transformer(**{k: v for k, v in batch.items() if k != self.dataset.label_key})
