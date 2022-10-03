@@ -95,8 +95,12 @@ class Dataset:
     @property
     def hash_fields(self) -> list[Any]:
         """For cache purpose"""
-        return [self.hparams.seed, self.tokenizer.__repr__(), self.hparams.max_length]
-        # TODO: self class name
+        return [
+            self.__class__,
+            self.hparams.seed,
+            self.tokenizer.__repr__(),
+            self.hparams.max_length,
+        ]
 
     @property
     def cache_path(self) -> str:
@@ -118,6 +122,10 @@ class Dataset:
     @property
     def test_splits(self) -> list[str]:
         return ["test"]
+
+    @property
+    def all_splits(self) -> list[str]:
+        return [self.train_split] + self.dev_splits + self.test_splits
 
     @property
     def text_key(self) -> str:
