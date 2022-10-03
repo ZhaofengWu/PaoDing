@@ -93,7 +93,7 @@ def add_generic_args(parser: ArgumentParser):
     parser.add_argument("--output_dir", default=None, type=str, required=True)
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--gpus", type=int, default=None)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=101)
 
 
 def train(
