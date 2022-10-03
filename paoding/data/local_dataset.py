@@ -1,9 +1,13 @@
 import argparse
 import os
+import pickle
 from typing import Callable
 
-from datasets import DatasetDict, load_dataset
+from datasets import Dataset as HFDataset, DatasetDict, load_dataset
+from datasets.packaged_modules import _EXTENSION_TO_MODULE
 from transformers import PreTrainedTokenizerBase
+
+DATASETS_SUPPORTED_FORMATS = _EXTENSION_TO_MODULE.keys()
 
 from paoding.data.dataset import Dataset
 
@@ -13,14 +17,15 @@ class LocalDataset(Dataset):
         self,
         hparams: argparse.Namespace,
         tokenizer: PreTrainedTokenizerBase,
+        format: str,
         split_filename: Callable[[str], str],
-        *load_args,
         preprocess_and_save: bool = True,
         tokenize_separately: bool = False,
         **load_kwargs,
     ):
         self.split_filename = split_filename
-        self.load_args = load_args
+        self.format = format
+        assert self.format in {"pkl_dict", "pkl_list", *DATASETS_SUPPORTED_FORMATS}
         self.load_kwargs = load_kwargs
         super().__init__(
             hparams,
@@ -30,13 +35,22 @@ class LocalDataset(Dataset):
         )
 
     def load(self) -> DatasetDict:
-        dataset_dict = load_dataset(
-            *self.load_args,
-            data_files={
-                split: os.path.join(self.hparams.data_dir, self.split_filename(split))
-                for split in [self.train_split] + self.dev_splits + self.test_splits
-            },
-            **self.load_kwargs,
-        )
-        assert isinstance(dataset_dict, DatasetDict)
+        split2path = {
+            split: os.path.join(self.hparams.data_dir, self.split_filename(split))
+            for split in self.all_splits
+        }
+        if self.format in DATASETS_SUPPORTED_FORMATS:
+            dataset_dict = load_dataset(self.format, data_files=split2path, **self.load_kwargs)
+            assert isinstance(dataset_dict, DatasetDict)
+        elif self.format in ("pkl_dict", "pkl_list"):
+            constructor = HFDataset.from_dict if self.format == "pkl_dict" else HFDataset.from_list
+            dataset_dict = DatasetDict(
+                {
+                    split: constructor(pickle.load(open(path, "rb")))
+                    for split, path in split2path.items()
+                }
+            )
+        else:
+            assert False
+
         return dataset_dict
