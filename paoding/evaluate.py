@@ -1,6 +1,7 @@
 from importlib import reload
 import logging
 import os
+import sys
 from typing import Type
 
 # PyTorch-Lightning's interruption of sigterm when using slurm seems to cause issues with
@@ -59,6 +60,8 @@ def add_eval_args(parser: ArgumentParser):
 
 
 def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True) -> tuple[list, list]:
+    argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
+
     parser = ArgumentParser()
     add_eval_args(parser)
     hparams = parser.parse_args()
@@ -105,6 +108,7 @@ def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True) -> 
         handlers=handlers,
         force=True,
     )
+    logger.info(f"Command: {sys.executable} {' '.join(argv)}")
 
     model.eval_test_splits = splits
     dataloaders = [

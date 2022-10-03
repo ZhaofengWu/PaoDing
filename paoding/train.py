@@ -3,6 +3,7 @@ import logging
 import os
 import json
 from pathlib import Path
+import sys
 from typing import Any, Type
 
 # PyTorch-Lightning's interruption of sigterm when using slurm seems to cause issues with
@@ -98,6 +99,8 @@ def add_generic_args(parser: ArgumentParser):
 def train(
     model_class: Type[Model], dataset_class: Type[Dataset], args: list = None
 ) -> tuple[str, Any]:
+    argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
+
     parser = ArgumentParser()
     add_generic_args(parser)
     model_class.add_args(parser)
@@ -148,6 +151,7 @@ def train(
         ],
         force=True,
     )
+    logger.info(f"Command: {sys.executable} {' '.join(argv)}")
 
     model = model_class(hparams)
 
