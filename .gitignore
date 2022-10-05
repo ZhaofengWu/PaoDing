@@ -130,3 +130,5 @@ dmypy.json
 
 .vscode/
 todo
+tests/output/*
+!tests/output/.gitkeep
