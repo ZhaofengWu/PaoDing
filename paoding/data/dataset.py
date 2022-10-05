@@ -131,9 +131,10 @@ class Dataset:
 
     @property
     def num_labels(self) -> int:
-        if self.output_mode == "classification":
+        if self.output_mode == "regression":
+            return 1
+        else:
             raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-        return None
 
     @property
     def metric_names(self) -> list[str]:

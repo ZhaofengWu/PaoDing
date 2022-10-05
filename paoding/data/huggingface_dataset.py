@@ -29,6 +29,7 @@ class HuggingfaceDataset(Dataset):
         output_mode: str,
         num_labels: int = None,
         metric_names: list[str],
+        metric_to_watch: str = None,
         metric_watch_mode: str,
     ):
         self.from_disk = from_disk_path is not None
@@ -50,6 +51,7 @@ class HuggingfaceDataset(Dataset):
         self._output_mode = output_mode
         self._num_labels = num_labels
         self._metric_names = metric_names
+        self._metric_to_watch = metric_to_watch
         self._metric_watch_mode = metric_watch_mode
 
         super().__init__(
@@ -93,11 +95,15 @@ class HuggingfaceDataset(Dataset):
 
     @property
     def num_labels(self) -> int:
-        return self._num_labels
+        return self._num_labels if self._num_labels is not None else super().num_labels
 
     @property
     def metric_names(self) -> list[str]:
         return self._metric_names
+
+    @property
+    def metric_to_watch(self) -> str:
+        return self._metric_to_watch if self._metric_to_watch is not None else super().metric_to_watch
 
     @property
     def metric_watch_mode(self) -> str:
