@@ -9,7 +9,6 @@ NB: if you want to use this library for development, it might be easier to `pip 
 The below examples trains and evaluate on MNLI. In our environment, it achieves 86.5%/86.6% accuracy on MNLI matched/mismatched dev sets.
 
 ```bash
-mkdir data_cache
 python examples/train_sequence_classification.py --data_dir data_cache --model_name_or_path bert-large-cased --batch_size 32 --max_length 256 --lr 0.00001 --warmup_ratio 0.06 --epochs 3 --clip_norm 1.0 --output_dir mnli
 python examples/evaluate.py --ckpt_path mnli/best.ckpt
 ```
