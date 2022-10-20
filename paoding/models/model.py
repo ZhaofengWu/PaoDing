@@ -290,9 +290,7 @@ class Model(pl.LightningModule):
     ) -> dict[str, Any]:
         return self.eval_step(batch, batch_idx, self.dataset.dev_splits[dataloader_idx])
 
-    def validation_epoch_end(
-        self, outputs: list[list[dict[str, Any]]] | list[dict[str, Any]]
-    ):
+    def validation_epoch_end(self, outputs: list[list[dict[str, Any]]] | list[dict[str, Any]]):
         # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
         # so we need a check here.
         self.eval_epoch_end(

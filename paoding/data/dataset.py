@@ -14,7 +14,7 @@ from transformers import PreTrainedTokenizerBase
 from transformers.trainer_pt_utils import LengthGroupedSampler, DistributedLengthGroupedSampler
 
 from paoding.argument_parser import ArgumentParser
-from paoding.data.collator import collate_fn, PAD_TYPE, BATCH_INFO
+from paoding.data.collator import collate_fn, BATCH_INFO
 from paoding.utils import get_logger
 
 # Sometimes we want to change the implementation of methods, etc., which cache ignores.
