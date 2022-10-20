@@ -2,6 +2,8 @@ from typing import Any
 
 from transformers import PreTrainedTokenizer
 
+from paoding.data.dataset import Dataset
+
 
 class Tokenizer(PreTrainedTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
@@ -13,14 +15,22 @@ class Tokenizer(PreTrainedTokenizer):
             mask_token="<MASK>",
             cls_token="<CLS>",
             sep_token="<SEP>",
+            bos_token="<BOS>",
+            eos_token="<EOS>",
         )
         self.special_token_to_id = {
             "<PAD>": self.pad_token_id,
             "<MASK>": self.mask_token_id,
             "<CLS>": self.cls_token_id,
             "<SEP>": self.sep_token_id,
+            "<BOS>": self.bos_token_id,
+            "<EOS>": self.eos_token_id,
         }
         self.special_id_to_token = {v: k for k, v in self.special_token_to_id.items()}
+
+    def prepare(self, dataset: Dataset):
+        """Prepare the tokenizer for the given dataset, such as to prepare the vocab."""
+        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     @property
     def pad_token_id(self) -> int:
@@ -37,6 +47,14 @@ class Tokenizer(PreTrainedTokenizer):
     @property
     def sep_token_id(self) -> int:
         return 3
+
+    @property
+    def bos_token_id(self) -> int:
+        return 4
+
+    @property
+    def eos_token_id(self) -> int:
+        return 5
 
     def __repr__(self) -> str:
         return self.__class__.__name__

@@ -14,6 +14,7 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import AdamW, PreTrainedTokenizerBase
 
 from paoding.argument_parser import ArgumentParser
+from paoding.data.tokenizer import Tokenizer
 
 
 class Model(pl.LightningModule):
@@ -36,6 +37,8 @@ class Model(pl.LightningModule):
             return
         self.tokenizer = self.setup_tokenizer()
         self.dataset = self.hparams.dataset_class(self.hparams, self.tokenizer)
+        if isinstance(self.tokenizer, Tokenizer):
+            self.tokenizer.prepare(self.dataset)
         self._data_is_prepared = True
 
     def setup(self, stage: str = None):
