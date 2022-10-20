@@ -139,8 +139,16 @@ class Dataset:
 
     @property
     def label_key(self) -> str:
-        """The key in the example dictionary for the label."""
-        return "label"
+        """
+        The key in the example dictionary for the label. Unlike for input fields, where we look for
+        the original field in the example dictionary under e.g. self.text_key and put it back under
+        e.g. "input_ids", labels typically do not need to be processed, so this same key is used
+        for both the label in the original example dictionary and the batch. For most tasks, we
+        default to looking for the "label" key (i.e., the singular, just like "text"). But for LM,
+        because of this dual purpose, we have to match what `transformers` looks for in the batch,
+        which is the plural "labels". Maybe there's a way to make this cleaner...
+        """
+        return "label" if self.task != "causal-lm" else "labels"
 
     @property
     def sort_key(self) -> str | tuple[str, str]:
@@ -217,6 +225,9 @@ class Dataset:
             dataset_dict["dev"] = dataset_dict["validation"]
             del dataset_dict["validation"]
 
+        if self.task == "causal-lm":
+            dataset_dict = DatasetDict({k: d.add_column(self.label_key, d["input_ids"]) for k, d in dataset_dict.items()})
+
         return dataset_dict
 
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
@@ -278,7 +289,12 @@ class Dataset:
             batch_info = new_batch_info
 
         label_dtype = torch.float if self.task == "regression" else torch.long
-        batch_info.update({self.label_key: (label_dtype, None)})
+        # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
+        # We could default to using 0 like above, but `torchmetrics` doesn't support masks yet,
+        # which makes it dangerous.
+        assert self.tokenizer.pad_token_id is not None
+        label_pad = self.tokenizer.pad_token_id if self.task == "causal-lm" else None
+        batch_info.update({self.label_key: (label_dtype, label_pad)})
         return batch_info
 
     def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:

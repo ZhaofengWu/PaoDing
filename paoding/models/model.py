@@ -49,6 +49,17 @@ class Model(pl.LightningModule):
         )
         self.dataset_size = len(self._train_dataloader.dataset)
 
+    @property
+    def metric_init_kwargs(self) -> dict[str, Any]:
+        kwargs = {}
+        if self.dataset.task == "classification":
+            kwargs["num_classes"] = self.dataset.num_labels
+        if self.dataset.task == "causal-lm":
+            # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
+            assert self.tokenizer.pad_token_id is not None
+            kwargs["ignore_index"] = self.tokenizer.pad_token_id
+        return kwargs
+
     def setup_metrics(self) -> dict[str, dict[str, Metric]]:
         metric_splits = (
             [self.dataset.train_split]
@@ -57,12 +68,9 @@ class Model(pl.LightningModule):
             + ["aggregate"]
         )
         assert len(metric_splits) == len(set(metric_splits))
-        metric_init_kwargs = {}
-        if self.dataset.output_mode == "classification":
-            metric_init_kwargs["num_classes"] = self.dataset.num_labels
         return {
             split: {
-                name: getattr(torchmetrics, name)(**metric_init_kwargs)
+                name: getattr(torchmetrics, name)(**self.metric_init_kwargs)
                 for name in self.dataset.metric_names
             }
             for split in metric_splits
@@ -158,14 +166,20 @@ class Model(pl.LightningModule):
                     loss = loss.sum() / mask.sum()
             case "regression":
                 loss = F.mse_loss(logits.view(-1), labels.view(-1))
+            # For some tasks such as causal-lm, you can directly use HF's corresponding model and
+            # the returned loss
             case _:
-                raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
+                raise KeyError(f"Output mode not supported: {self.dataset.task}")
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, Any]:
-        loss = self.compute_loss(
-            self(batch)["logits"], batch[self.dataset.label_key], batch.get("label_mask")
-        )
+        output = self(batch)
+        if "loss" in output:
+            loss = output["loss"]
+        else:
+            loss = self.compute_loss(
+                output["logits"], batch[self.dataset.label_key], batch.get("label_mask")
+            )
         self.log("train_loss", loss, on_step=False, on_epoch=True)
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
         return {"loss": loss}
@@ -176,8 +190,14 @@ class Model(pl.LightningModule):
                 return logits.argmax(dim=-1)
             case "regression":
                 return logits.squeeze(dim=-1)
+            case "causal-lm":
+                # Perplexity is a weird metric as it needs the raw distribution... So this is
+                # actually not a prediction, and we need to do something else for real decoding.
+                # But then, the problem there is more complicated anyway since there's beam search
+                # etc.
+                return logits[..., :-1, :]
             case _:
-                raise KeyError(f"Output mode not supported: {self.dataset.output_mode}")
+                raise KeyError(f"Output mode not supported: {self.dataset.task}")
 
     def eval_step(
         self,
@@ -186,23 +206,29 @@ class Model(pl.LightningModule):
         split: str,
         compute_loss=True,
     ) -> dict[str, Any]:
-        logits = self(batch)["logits"]
-        preds = self.get_predictions(logits, batch)
+        output = self(batch)
+        preds = self.get_predictions(output["logits"], batch)
         labels = batch[self.dataset.label_key]
+        if self.dataset.task == "causal-lm":
+            labels = labels[..., 1:]
 
         for s in (split, "aggregate"):
             for metric in self.metrics[s].values():
+                # TODO: this may need a label_mask for token classification
                 metric(preds.detach(), labels.detach())
 
-        loss_dict = (
-            {"loss": self.compute_loss(logits, labels, batch.get("label_mask")).detach().cpu()}
-            if compute_loss
-            else {}
-        )
-        return loss_dict | {
+        return_dict = {
             "preds": preds.detach().cpu().numpy(),
             "labels": labels.detach().cpu().numpy(),
         }
+        if compute_loss:
+            loss = (
+                output["loss"]
+                if "loss" in output
+                else self.compute_loss(output["logits"], labels, batch.get("label_mask"))
+            )
+            return_dict["loss"] = loss.detach().cpu()
+        return return_dict
 
     def eval_epoch_end(
         self, splits: list[str], outputs: list[list[dict[str, Any]]], set_preds_labels=False
