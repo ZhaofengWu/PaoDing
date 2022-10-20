@@ -25,7 +25,7 @@ class HuggingfaceDataset(Dataset):
         second_text_key: str = None,
         label_key: str,
         sort_key: str | tuple[str, str] = None,
-        output_mode: str,
+        task: str,
         num_labels: int = None,
         metric_names: list[str],
         metric_to_watch: str = None,
@@ -47,7 +47,7 @@ class HuggingfaceDataset(Dataset):
         self._second_text_key = second_text_key
         self._label_key = label_key
         self._sort_key = sort_key
-        self._output_mode = output_mode
+        self._task = task
         self._num_labels = num_labels
         self._metric_names = metric_names
         self._metric_to_watch = metric_to_watch
@@ -89,8 +89,8 @@ class HuggingfaceDataset(Dataset):
         return self._sort_key if self._sort_key is not None else super().sort_key
 
     @property
-    def output_mode(self) -> str:
-        return self._output_mode
+    def task(self) -> str:
+        return self._task
 
     @property
     def num_labels(self) -> int:

@@ -14,7 +14,7 @@ if __name__ == "__main__":
         text_key="premise",
         second_text_key="hypothesis",
         label_key="label",
-        output_mode="classification",
+        task="classification",
         num_labels=3,
         metric_names=["Accuracy"],
         metric_watch_mode="max",

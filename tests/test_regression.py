@@ -14,7 +14,7 @@ if __name__ == "__main__":
         text_key="sentence1",
         second_text_key="sentence2",
         label_key="label",
-        output_mode="regression",
+        task="regression",
         metric_names=["PearsonCorrCoef", "SpearmanCorrCoef"],
         metric_to_watch="PearsonCorrCoef",
         metric_watch_mode="max",

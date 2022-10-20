@@ -151,12 +151,12 @@ class Dataset:
         )
 
     @property
-    def output_mode(self) -> str:
+    def task(self) -> str:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
     @property
     def num_labels(self) -> int:
-        if self.output_mode == "regression":
+        if self.task == "regression":
             return 1
         else:
             raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
@@ -277,7 +277,7 @@ class Dataset:
                 new_batch_info.update({f"{k}_{i}": v for k, v in batch_info.items()})
             batch_info = new_batch_info
 
-        label_dtype = torch.float if self.output_mode == "regression" else torch.long
+        label_dtype = torch.float if self.task == "regression" else torch.long
         batch_info.update({self.label_key: (label_dtype, None)})
         return batch_info
 

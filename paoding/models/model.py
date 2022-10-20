@@ -145,7 +145,7 @@ class Model(pl.LightningModule):
     def compute_loss(
         self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
     ) -> torch.Tensor:
-        match self.dataset.output_mode:
+        match self.dataset.task:
             case "classification":
                 loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))
             case "token_classification":
@@ -171,7 +171,7 @@ class Model(pl.LightningModule):
         return {"loss": loss}
 
     def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        match self.dataset.output_mode:
+        match self.dataset.task:
             case "classification" | "token_classification":
                 return logits.argmax(dim=-1)
             case "regression":
