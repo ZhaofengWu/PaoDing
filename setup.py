@@ -25,7 +25,7 @@ setup(
         "allennlp @ git+https://github.com/allenai/allennlp.git@a09d057cb2c711743e3a3fc8597398f37165f71a",
         "datasets==1.12.1",
         "dill==0.3.4",  # https://github.com/huggingface/datasets/issues/5061
-        "multiprocess=0.70.12.2",  # https://github.com/huggingface/datasets/issues/5061
+        "multiprocess==0.70.12.2",  # https://github.com/huggingface/datasets/issues/5061
         "numpy==1.21.2",
         "pytorch-lightning==1.4.8",
         "seaborn==0.11.2",
