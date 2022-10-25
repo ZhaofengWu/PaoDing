@@ -28,6 +28,7 @@ setup(
         "multiprocess==0.70.12.2",  # https://github.com/huggingface/datasets/issues/5061
         "numpy==1.21.2",
         "pytorch-lightning==1.4.8",
+        "scikit-learn",
         "seaborn==0.11.2",
         "tokenizers==0.10.3",
         "torch==1.9.1",
