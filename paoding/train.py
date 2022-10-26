@@ -34,9 +34,20 @@ class LoggingCallback(pl.Callback):
 
     @rank_zero_only
     def on_validation_end(self, trainer: pl.Trainer, pl_module: Model):
+        if not trainer.sanity_checking:
+            return
+
+        logger.info("")
+        logger.info("***** Validation results after sanity checking *****")
+        self.log_metrics(trainer, pl_module)
+
+    @rank_zero_only
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: Model):
         logger.info("")
         logger.info(f"***** Validation results at epoch {trainer.current_epoch} *****")
+        self.log_metrics(trainer, pl_module)
 
+    def log_metrics(self, trainer: pl.Trainer, pl_module: Model):
         assert pl_module.dataset.metric_watch_mode in {"max", "min"}
 
         metrics = trainer.callback_metrics
