@@ -85,15 +85,20 @@ class LoggingCallback(pl.Callback):
 def parse_meta_args(add_args_fn):
     """
     A meta parser that can be used to decide the model and dataset classes.
-    Typical usage:
+    Example usage:
 
     ```
+    def add_meta_args(parser: ArgumentParser):
+        parser.add_argument("--model_type", type=str, required=True)
+        parser.add_argument("--data_type", type=str, required=True)
+
     meta_args, extra_args = parse_meta_args(add_meta_args)
     train(
         MODEL_MAP[meta_args.model_type],
         DATASET_MAP[meta_args.data_type],
         args=extra_args,
     )
+    ```
     """
     parser = ArgumentParser()
     add_args_fn(parser)
