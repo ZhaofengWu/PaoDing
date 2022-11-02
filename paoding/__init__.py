@@ -5,6 +5,7 @@ from .models.model import Model
 from .models.transformer_model import TransformerModel
 from .modules.pooler import Pooler
 from .modules.positional_embedding import PositionalEmbedding
+from .modules.rnn import RNN
 from .modules.transformer import Transformer
 from .data.tokenizer import Tokenizer
 from .utils import Lazy
