@@ -36,6 +36,7 @@ setup(
         "torchmetrics==0.10.0",
         "tqdm==4.64.1",
         "transformers==4.23.0",
+        "wandb==0.13.4",
     ],
     python_requires=">=3.10.0",
 )

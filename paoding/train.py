@@ -13,6 +13,8 @@ os.environ.pop("SLURM_NTASKS", None)
 os.environ.pop("SLURM_JOB_NAME", None)
 
 import pytorch_lightning as pl
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.utilities import rank_zero_only
 
 reload(logging)
@@ -110,10 +112,14 @@ def add_generic_args(parser: ArgumentParser):
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--gpus", type=int, default=None)
     parser.add_argument("--seed", type=int, default=101)
+    parser.add_argument("--no_wandb", action="store_true")  # for debugging
 
 
 def train(
-    model_class: Type[Model], dataset_class: Type[Dataset], args: list = None
+    model_class: Type[Model],
+    dataset_class: Type[Dataset],
+    args: list = None,
+    wandb_info: dict = None,
 ) -> tuple[str, Any]:
     argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
 
@@ -181,6 +187,10 @@ def train(
         save_last=True,
     )
 
+    trainer_loggers = [TensorBoardLogger(hparams.output_dir)]
+    if not hparams.no_wandb and wandb_info is not None:
+        output_dir_basename = os.path.basename(os.path.normpath(hparams.output_dir))
+        trainer_loggers.append(WandbLogger(name=output_dir_basename, **wandb_info))
     trainer = pl.Trainer(
         default_root_dir=hparams.output_dir,
         gradient_clip_val=hparams.clip_norm,
@@ -188,6 +198,7 @@ def train(
         accumulate_grad_batches=hparams.accumulate_grad_batches,
         max_epochs=hparams.epochs,
         precision=16 if hparams.fp16 else 32,
+        logger=trainer_loggers,
         callbacks=[loging_callback, checkpoint_callback],
         replace_sampler_ddp=False,
     )
