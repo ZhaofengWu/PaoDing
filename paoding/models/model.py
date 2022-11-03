@@ -58,7 +58,7 @@ class Model(pl.LightningModule):
         kwargs = {}
         if self.dataset.task == "classification":
             kwargs["num_classes"] = self.dataset.num_labels
-        if self.dataset.task == "causal-lm":
+        if self.dataset.task == "causal_lm":
             # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
             assert self.tokenizer.pad_token_id is not None
             kwargs["ignore_index"] = self.tokenizer.pad_token_id
@@ -168,19 +168,17 @@ class Model(pl.LightningModule):
     ) -> torch.Tensor:
         match self.dataset.task:
             case "classification":
-                loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), labels.view(-1))
-            case "token_classification":
+                loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
+            case "token_classification" | "causal_lm":
                 assert mask.any(dim=-1).all()
                 loss = F.cross_entropy(
-                    logits.view(-1, logits.shape[-1]), labels.view(-1), reduction="none"
+                    logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), reduction="none"
                 )
-                loss = loss.view_as(labels) * mask
+                loss = loss.reshape_as(labels) * mask
                 if reduce:
                     loss = loss.sum() / mask.sum()
             case "regression":
-                loss = F.mse_loss(logits.view(-1), labels.view(-1))
-            # For some tasks such as causal-lm, you can directly use HF's corresponding model and
-            # the returned loss
+                loss = F.mse_loss(logits.reshape(-1), labels.reshape(-1))
             case _:
                 raise KeyError(f"Output mode not supported: {self.dataset.task}")
         return loss
@@ -191,7 +189,7 @@ class Model(pl.LightningModule):
             loss = output["loss"]
         else:
             loss = self.compute_loss(
-                output["logits"], batch[self.dataset.label_key], batch.get("label_mask")
+                output["logits"], batch[self.dataset.label_key], batch.get(self.dataset.label_mask_key)
             )
         self.log("train_loss", loss, on_step=False, on_epoch=True)
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
@@ -203,12 +201,12 @@ class Model(pl.LightningModule):
                 return logits.argmax(dim=-1)
             case "regression":
                 return logits.squeeze(dim=-1)
-            case "causal-lm":
+            case "causal_lm":
                 # Perplexity is a weird metric as it needs the raw distribution... So this is
                 # actually not a prediction, and we need to do something else for real decoding.
                 # But then, the problem there is more complicated anyway since there's beam search
                 # etc.
-                return logits[..., :-1, :]
+                return logits
             case _:
                 raise KeyError(f"Output mode not supported: {self.dataset.task}")
 
@@ -222,8 +220,6 @@ class Model(pl.LightningModule):
         output = self(batch)
         preds = self.get_predictions(output["logits"], batch)
         labels = batch[self.dataset.label_key]
-        if self.dataset.task == "causal-lm":
-            labels = labels[..., 1:]
 
         for s in (split, "aggregate"):
             for metric in self.metrics[s].values():
@@ -238,7 +234,7 @@ class Model(pl.LightningModule):
             loss = (
                 output["loss"]
                 if "loss" in output
-                else self.compute_loss(output["logits"], labels, batch.get("label_mask"))
+                else self.compute_loss(output["logits"], labels, batch.get(self.dataset.label_mask_key))
             )
             return_dict["loss"] = loss.detach().cpu()
         return return_dict
@@ -262,6 +258,11 @@ class Model(pl.LightningModule):
 
         for split, split_outputs in zip(splits, outputs, strict=True):
             metrics = self.get_metrics(split, reset=True)
+
+            if "loss" in split_outputs[0]:
+                loss = sum(o["loss"] for o in split_outputs) / len(split_outputs)
+                metrics |= {"loss": loss}
+
             for k, v in metrics.items():
                 if num_splits > 1:
                     assert f"{k}_{split}" not in metrics

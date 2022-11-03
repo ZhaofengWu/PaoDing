@@ -74,7 +74,6 @@ class Dataset:
                 logger.info(f"Saving dataset cache at {self.cache_path}")
                 self.dataset_dict.save_to_disk(self.cache_path)
 
-        # TODO: remove
         self.hparams.subsample_training_ratio = getattr(
             self.hparams, "subsample_training_ratio", None
         )
@@ -139,16 +138,12 @@ class Dataset:
 
     @property
     def label_key(self) -> str:
-        """
-        The key in the example dictionary for the label. Unlike for input fields, where we look for
-        the original field in the example dictionary under e.g. self.text_key and put it back under
-        e.g. "input_ids", labels typically do not need to be processed, so this same key is used
-        for both the label in the original example dictionary and the batch. For most tasks, we
-        default to looking for the "label" key (i.e., the singular, just like "text"). But for LM,
-        because of this dual purpose, we have to match what `transformers` looks for in the batch,
-        which is the plural "labels". Maybe there's a way to make this cleaner...
-        """
-        return "label" if self.task != "causal-lm" else "labels"
+        return "label"
+
+    @property
+    def label_mask_key(self) -> str:
+        """The key in the example dictionary for the label mask, for tasks such as LM."""
+        return "label_mask"
 
     @property
     def sort_key(self) -> str | tuple[str, str]:
@@ -225,8 +220,22 @@ class Dataset:
             dataset_dict["dev"] = dataset_dict["validation"]
             del dataset_dict["validation"]
 
-        if self.task == "causal-lm":
-            dataset_dict = DatasetDict({k: d.add_column(self.label_key, d["input_ids"]) for k, d in dataset_dict.items()})
+        if self.task == "causal_lm":
+            dataset_dict = DatasetDict(
+                {
+                    k: d.map(
+                        lambda examples: {
+                            "input_ids": examples["input_ids"][:-1],
+                            "attention_mask": examples["attention_mask"][:-1],
+                            self.label_key: examples["input_ids"][1:],
+                            self.label_mask_key: examples["attention_mask"][1:],
+                        },
+                        batched=False,
+                        num_proc=4,
+                    )
+                    for k, d in dataset_dict.items()
+                }
+            )
 
         return dataset_dict
 
@@ -293,8 +302,10 @@ class Dataset:
         # We could default to using 0 like above, but `torchmetrics` doesn't support masks yet,
         # which makes it dangerous.
         assert self.tokenizer.pad_token_id is not None
-        label_pad = self.tokenizer.pad_token_id if self.task == "causal-lm" else None
+        label_pad = self.tokenizer.pad_token_id if self.task == "causal_lm" else None
         batch_info.update({self.label_key: (label_dtype, label_pad)})
+        if self.task == "causal_lm":
+            batch_info.update({self.label_mask_key: (torch.bool, False)})
         return batch_info
 
     def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:
