@@ -24,6 +24,7 @@ setup(
     install_requires=[
         "datasets==2.5.1",
         "dill==0.3.4",  # https://github.com/huggingface/datasets/issues/5061
+        "lightning-utilities==0.3.0",
         "multiprocess==0.70.12.2",  # https://github.com/huggingface/datasets/issues/5061
         "numpy==1.23.3",
         "pytorch-lightning==1.7.7",

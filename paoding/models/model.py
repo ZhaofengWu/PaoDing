@@ -2,6 +2,7 @@ import argparse
 from collections import defaultdict
 from typing import Any
 
+from lightning_utilities.core.apply_func import apply_to_collection
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -152,6 +153,15 @@ class Model(pl.LightningModule):
 
     def forward(self, batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    def on_fit_start(self):
+        apply_to_collection(self.metrics, Metric, lambda metric: metric.to(self.device))
+
+    def on_validation_start(self):
+        apply_to_collection(self.metrics, Metric, lambda metric: metric.to(self.device))
+
+    def on_test_start(self):
+        apply_to_collection(self.metrics, Metric, lambda metric: metric.to(self.device))
 
     def compute_loss(
         self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
