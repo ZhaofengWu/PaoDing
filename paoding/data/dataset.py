@@ -239,6 +239,18 @@ class Dataset:
 
         return dataset_dict
 
+    def num_dataloader_workers(self) -> int:
+        # Modified from https://github.com/pytorch/pytorch/blob/7c98e70d44abc7a1aead68b6ea6c8adc8c554db5/torch/utils/data/dataloader.py#L482
+        if hasattr(os, "sched_getaffinity"):
+            try:
+                return len(os.sched_getaffinity(0))
+            except Exception:
+                pass
+        cpu_count = os.cpu_count()
+        if cpu_count is not None:
+            return cpu_count
+        return 2
+
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset_dict[split]
         sampler = None
@@ -260,7 +272,7 @@ class Dataset:
             batch_size=batch_size,
             shuffle=shuffle,
             sampler=sampler,
-            num_workers=2,
+            num_workers=self.num_dataloader_workers(),
             collate_fn=lambda batch: collate_fn(
                 self.before_collation(batch), batch_info, self.tokenizer.padding_side
             ),
