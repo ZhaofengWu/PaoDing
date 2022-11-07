@@ -3,6 +3,7 @@ import logging
 import os
 import json
 from pathlib import Path
+import shutil
 import sys
 from typing import Any, Type
 
@@ -132,9 +133,23 @@ def train(
     output_dir = hparams.output_dir
     if os.path.exists(output_dir):
         content = os.listdir(output_dir)
-        # For DDP, when subprocesses are launched, there'll be a log.txt inside the folder already
-        if len(content) > 0 and content != ["log.txt"]:
-            raise ValueError(f"Output directory ({output_dir}) already exists and is not empty.")
+        whitelist_files = {"log.txt", "lightning_logs", "hparams.json"}
+        if len(content) > 0 and any(c not in whitelist_files for c in content):
+            raise ValueError(
+                f"Output directory ({output_dir}) already exists and is not empty."
+            )
+        for c in content:
+            # TODO: check if this works for DDP -- log.txt is created by the master process and
+            # may be assumed to exist by the launched processes?
+            full_path = os.path.join(output_dir, c)
+            if os.path.isfile(full_path):
+                os.remove(full_path)
+            elif os.path.isdir(full_path):
+                shutil.rmtree(full_path)
+            else:
+                # Technically there may be other possibilities, but we know the things on the
+                # whitelist shouldn't be anything weird.
+                assert False
     else:
         os.mkdir(output_dir)
 
