@@ -30,6 +30,7 @@ setup(
         "pytorch-lightning==1.4.8",
         "scikit-learn",
         "seaborn==0.11.2",
+        "setuptools==59.5.0",
         "tokenizers==0.10.3",
         "torch==1.9.1",
         "torchmetrics==0.5.1",
