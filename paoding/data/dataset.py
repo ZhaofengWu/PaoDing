@@ -241,6 +241,8 @@ class Dataset:
 
     def num_dataloader_workers(self) -> int:
         # Modified from https://github.com/pytorch/pytorch/blob/7c98e70d44abc7a1aead68b6ea6c8adc8c554db5/torch/utils/data/dataloader.py#L482
+        if self.hparams.debug:
+            return 0
         if hasattr(os, "sched_getaffinity"):
             try:
                 return len(os.sched_getaffinity(0))

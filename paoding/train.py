@@ -1,3 +1,4 @@
+import argparse
 from importlib import reload
 import logging
 import os
@@ -114,30 +115,27 @@ def add_generic_args(parser: ArgumentParser):
     parser.add_argument("--gpus", type=int, default=None)
     parser.add_argument("--seed", type=int, default=101)
     parser.add_argument("--no_wandb", action="store_true")  # for debugging
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Turn on a few things that may slow down the run but makes debugging easier. E.g.,"
+        " running in post-mortem mode and using no separate dataloader worker.",
+    )
 
 
-def train(
+def wrapped_train(
+    hparams: argparse.Namespace,
+    argv: list[str],
     model_class: Type[Model],
     dataset_class: Type[Dataset],
-    args: list = None,
     wandb_info: dict = None,
 ) -> tuple[str, Any]:
-    argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
-
-    parser = ArgumentParser()
-    add_generic_args(parser)
-    model_class.add_args(parser)
-    dataset_class.add_args(parser)
-    hparams = parser.parse_args(args=args)
-
     output_dir = hparams.output_dir
     if os.path.exists(output_dir):
         content = os.listdir(output_dir)
         whitelist_files = {"log.txt", "lightning_logs", "hparams.json"}
         if len(content) > 0 and any(c not in whitelist_files for c in content):
-            raise ValueError(
-                f"Output directory ({output_dir}) already exists and is not empty."
-            )
+            raise ValueError(f"Output directory ({output_dir}) already exists and is not empty.")
         for c in content:
             # TODO: check if this works for DDP -- log.txt is created by the master process and
             # may be assumed to exist by the launched processes?
@@ -227,3 +225,33 @@ def train(
         print(f"Model saved at {symlink_path} -> {checkpoint_callback.best_model_path}")
 
     return model.dataset.metric_to_watch, loging_callback.best_dev_metric
+
+
+def train(
+    model_class: Type[Model],
+    dataset_class: Type[Dataset],
+    args: list = None,
+    wandb_info: dict = None,
+) -> tuple[str, Any]:
+    argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
+
+    parser = ArgumentParser()
+    add_generic_args(parser)
+    model_class.add_args(parser)
+    dataset_class.add_args(parser)
+    hparams = parser.parse_args(args=args)
+
+    if hparams.debug:
+        try:
+            return wrapped_train(hparams, argv, model_class, dataset_class, wandb_info=wandb_info)
+        except Exception as e:
+            import pdb
+            import traceback
+
+            if not isinstance(e, (pdb.bdb.BdbQuit, KeyboardInterrupt)):
+                print("\n" + ">" * 100 + "\n")
+                traceback.print_exc()
+                print()
+                pdb.post_mortem()
+    else:
+        return wrapped_train(hparams, argv, model_class, dataset_class, wandb_info=wandb_info)
