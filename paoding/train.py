@@ -242,6 +242,7 @@ def train(
     hparams = parser.parse_args(args=args)
 
     if hparams.debug:
+        os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
         try:
             return wrapped_train(hparams, argv, model_class, dataset_class, wandb_info=wandb_info)
         except Exception as e:
