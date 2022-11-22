@@ -27,6 +27,7 @@ setup(
         "lightning-utilities==0.3.0",
         "multiprocess==0.70.12.2",  # https://github.com/huggingface/datasets/issues/5061
         "numpy==1.23.3",
+        "pyarros==6.0.1",  # https://github.com/huggingface/datasets/issues/3310
         "pytorch-lightning==1.7.7",
         "scikit-learn==1.1.2",
         "seaborn==0.12.0",
