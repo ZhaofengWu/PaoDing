@@ -18,6 +18,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.utilities import rank_zero_only
+import torchmetrics
 
 reload(logging)
 
@@ -52,9 +53,9 @@ class LoggingCallback(pl.Callback):
         self.log_metrics(trainer, pl_module)
 
     def log_metrics(self, trainer: pl.Trainer, pl_module: Model):
-        assert pl_module.dataset.metric_watch_mode in {"max", "min"}
-
         metrics = trainer.callback_metrics
+        higher_is_better = getattr(torchmetrics, pl_module.dataset.metric_to_watch).higher_is_better
+        assert higher_is_better is not None
         # Log results
         for key in sorted(metrics):
             if key not in ["log", "progress_bar"]:
@@ -63,14 +64,8 @@ class LoggingCallback(pl.Callback):
             if key == pl_module.dataset.metric_to_watch and not trainer.sanity_checking:
                 if (
                     self.best_dev_metric is None
-                    or (
-                        pl_module.dataset.metric_watch_mode == "max"
-                        and metrics[key] > self.best_dev_metric
-                    )
-                    or (
-                        pl_module.dataset.metric_watch_mode == "min"
-                        and metrics[key] < self.best_dev_metric
-                    )
+                    or (higher_is_better and metrics[key] > self.best_dev_metric)
+                    or (not higher_is_better and metrics[key] < self.best_dev_metric)
                 ):
                     self.best_epoch = trainer.current_epoch
                     self.best_dev_metric = metrics[key]
@@ -191,11 +186,13 @@ def wrapped_train(
     model = model_class(hparams)
 
     loging_callback = LoggingCallback()
+    higher_is_better = getattr(torchmetrics, model.dataset.metric_to_watch).higher_is_better
+    assert higher_is_better is not None
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=output_dir,
         filename=f"{{epoch}}_{{{model.dataset.metric_to_watch}:.4f}}",
         monitor=model.dataset.metric_to_watch,
-        mode=model.dataset.metric_watch_mode,
+        mode="max" if higher_is_better else "min",
         save_top_k=1,
         save_last=True,
     )

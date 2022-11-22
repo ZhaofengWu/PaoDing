@@ -17,6 +17,5 @@ if __name__ == "__main__":
         task="classification",
         num_labels=3,
         metric_names=["Accuracy"],
-        metric_watch_mode="max",
     )
     train(model_cls, dataset_cls)

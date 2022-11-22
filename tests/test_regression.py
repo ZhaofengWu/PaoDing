@@ -17,6 +17,5 @@ if __name__ == "__main__":
         task="regression",
         metric_names=["PearsonCorrCoef", "SpearmanCorrCoef"],
         metric_to_watch="PearsonCorrCoef",
-        metric_watch_mode="max",
     )
     train(model_cls, dataset_cls)

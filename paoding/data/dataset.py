@@ -175,10 +175,6 @@ class Dataset:
         else:
             raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
-    @property
-    def metric_watch_mode(self) -> str:
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
-
     def load(self) -> DatasetDict:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
