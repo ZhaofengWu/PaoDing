@@ -59,12 +59,14 @@ def add_eval_args(parser: ArgumentParser):
     add_analysis_args(parser)
 
 
-def evaluate(model_class: Type[Model], dataset_class=None, strict_load=True) -> tuple[list, list]:
+def evaluate(
+    model_class: Type[Model], dataset_class=None, strict_load=True, args: list = None
+) -> tuple[list, list]:
     argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
 
     parser = ArgumentParser()
     add_eval_args(parser)
-    hparams = parser.parse_args()
+    hparams = parser.parse_args(args=args)
 
     if hparams.gpus is None:
         hparams.gpus = (
