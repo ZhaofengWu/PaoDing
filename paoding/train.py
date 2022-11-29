@@ -18,6 +18,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.utilities import rank_zero_only
+from pytorch_lightning.utilities.cloud_io import load as pl_load
 import torchmetrics
 
 reload(logging)
@@ -106,6 +107,10 @@ def parse_meta_args(add_args_fn):
 
 def add_generic_args(parser: ArgumentParser):
     parser.add_argument("--output_dir", default=None, type=str, required=True)
+    parser.add_argument(
+        "--ckpt_path", default=None, type=str, help="If specified, load the weights from this ckpt."
+    )
+    parser.add_argument("--non_strict_load", action="store_true")
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--gpus", type=int, default=None)
     parser.add_argument("--seed", type=int, default=101)
@@ -184,6 +189,14 @@ def wrapped_train(
     logger.info(f"Command: {sys.executable} {' '.join(argv)}")
 
     model = model_class(hparams)
+    if hparams.ckpt_path is not None:
+        ckpt = pl_load(hparams.ckpt_path)
+        keys = model.load_state_dict(ckpt["state_dict"], strict=not hparams.non_strict_load)
+        if hparams.non_strict_load:
+            if keys.missing_keys:
+                logger.warning(f"Missing keys in state dict: {keys.missing_keys}")
+            if keys.unexpected_keys:
+                logger.warning(f"Unexpected keys in state dict: {keys.unexpected_keys}")
 
     loging_callback = LoggingCallback()
     higher_is_better = getattr(torchmetrics, model.dataset.metric_to_watch).higher_is_better
