@@ -108,6 +108,7 @@ def parse_meta_args(add_args_fn):
 
 def add_generic_args(parser: ArgumentParser):
     parser.add_argument("--output_dir", default=None, type=str, required=True)
+    parser.add_argument("--delete_existing_output", action="store_true")
     parser.add_argument(
         "--ckpt_path", default=None, type=str, help="If specified, load the weights from this ckpt."
     )
@@ -133,22 +134,25 @@ def wrapped_train(
 ) -> tuple[str, Any]:
     output_dir = hparams.output_dir
     if os.path.exists(output_dir):
-        content = os.listdir(output_dir)
-        whitelist_files = {"log.txt", "lightning_logs", "hparams.json"}
-        if len(content) > 0 and any(c not in whitelist_files for c in content):
-            raise ValueError(f"Output directory ({output_dir}) already exists and is not empty.")
-        for c in content:
-            # TODO: check if this works for DDP -- log.txt is created by the master process and
-            # may be assumed to exist by the launched processes?
-            full_path = os.path.join(output_dir, c)
-            if os.path.isfile(full_path):
-                os.remove(full_path)
-            elif os.path.isdir(full_path):
-                shutil.rmtree(full_path)
-            else:
-                # Technically there may be other possibilities, but we know the things on the
-                # whitelist shouldn't be anything weird.
-                assert False
+        if hparams.delete_existing_output:
+            shutil.rmtree(output_dir)
+        else:
+            content = os.listdir(output_dir)
+            whitelist_files = {"log.txt", "lightning_logs", "hparams.json"}
+            if len(content) > 0 and any(c not in whitelist_files for c in content):
+                raise ValueError(f"Output directory ({output_dir}) already exists and is not empty.")
+            for c in content:
+                # TODO: check if this works for DDP -- log.txt is created by the master process and
+                # may be assumed to exist by the launched processes?
+                full_path = os.path.join(output_dir, c)
+                if os.path.isfile(full_path):
+                    os.remove(full_path)
+                elif os.path.isdir(full_path):
+                    shutil.rmtree(full_path)
+                else:
+                    # Technically there may be other possibilities, but we know the things on the
+                    # whitelist shouldn't be anything weird.
+                    assert False
     else:
         os.mkdir(output_dir)
 
