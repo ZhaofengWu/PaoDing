@@ -63,7 +63,7 @@ class LoggingCallback(pl.Callback):
             if key not in ["log", "progress_bar"]:
                 logger.info("{} = {}".format(key, str(metrics[key])))
 
-            if key == pl_module.dataset.metric_to_watch and not trainer.sanity_checking:
+            if key == pl_module.dataset.metric_split_to_watch and not trainer.sanity_checking:
                 if (
                     self.best_dev_metric is None
                     or (higher_is_better and metrics[key] > self.best_dev_metric)
@@ -204,8 +204,8 @@ def wrapped_train(
     assert higher_is_better is not None
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=output_dir,
-        filename=f"{{epoch}}_{{{model.dataset.metric_to_watch}:.4f}}",
-        monitor=model.dataset.metric_to_watch,
+        filename=f"{{epoch}}_{{{model.dataset.metric_split_to_watch}:.4f}}",
+        monitor=model.dataset.metric_split_to_watch,
         mode="max" if higher_is_better else "min",
         save_top_k=1,
         save_last=True,

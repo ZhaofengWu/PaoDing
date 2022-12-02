@@ -175,6 +175,21 @@ class Dataset:
         else:
             raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
+    @property
+    def split_to_watch(self) -> str:
+        # When there are multiple dev splits, you can specify which one to watch. By default, the
+        # average performance across the dev splits is used.
+        return None
+
+    @property
+    def metric_split_to_watch(self) -> str:
+        # Matches the format in model.eval_epoch_end()
+        return (
+            f"{self.metric_to_watch}_{self.split_to_watch}"
+            if self.split_to_watch
+            else self.metric_to_watch
+        )
+
     def load(self) -> DatasetDict:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 

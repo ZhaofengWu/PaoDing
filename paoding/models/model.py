@@ -71,7 +71,6 @@ class Model(pl.LightningModule):
             + self.dataset.test_splits
             + ["aggregate"]
         )
-        assert len(metric_splits) == len(set(metric_splits))
         return {
             split: {
                 name: getattr(torchmetrics, name)(**self.metric_init_kwargs)
@@ -189,7 +188,9 @@ class Model(pl.LightningModule):
             loss = output["loss"]
         else:
             loss = self.compute_loss(
-                output["logits"], batch[self.dataset.label_key], batch.get(self.dataset.label_mask_key)
+                output["logits"],
+                batch[self.dataset.label_key],
+                batch.get(self.dataset.label_mask_key),
             )
         self.log("train_loss", loss, on_step=False, on_epoch=True)
         self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
