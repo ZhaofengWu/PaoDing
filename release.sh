@@ -7,6 +7,11 @@ if [[ ${#} -ne 1 ]]; then
     exit 1
 fi
 
+if ! pip show build || ! pip show twine; then
+    echo "ahhh"
+    exit 1
+fi
+
 version=$1
 release_folder=release-${version}
 
@@ -26,4 +31,5 @@ git checkout ${version}
 python -m build
 twine upload dist/*
 
+cd ..
 rm -rf ${release_folder}
