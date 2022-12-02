@@ -1,8 +1,6 @@
 # PaoDing
 
-An opiniated NLP-oriented PyTorch wrapper that makes your life easier. It is in spirit similar to AllenNLP. The goal of this library is to hide all boilerplate code. I created it so that I don't have to dig through the codebase to understand how something works in other libraries or create a PR every time I find something inconvenient to use. Also, perhaps in contrast to other libraries, the hiding of boilerplate is aggressive -- when something could either be hidden or not hidden, it usually errs on the side of hiding it.
-
-NB: if you want to use this library for development, it might be easier to `pip install -e .` from source, so that you can put breakpoints anywhere.
+An opiniated NLP-oriented PyTorch wrapper that makes your life easier. It is in spirit similar to AllenNLP. The goal of this library is to hide as much boilerplate code as possible, while still maintaining large control over my experiments. Be careful if you plan to depend on this library directly. It is intended to be a personal infrastructure library, so while I should generally be happy to fix bugs, I may not have the bandwidth to implement feature requests if it's not directly related to what I'm doing. Though PRs are always welcome.
 
 ## Examples
 
@@ -12,6 +10,8 @@ The below examples trains and evaluate on MNLI. In our environment, it achieves 
 python examples/train_sequence_classification.py --data_dir data_cache --transformer_model bert-large-cased --batch_size 32 --max_length 256 --lr 0.00001 --warmup_ratio 0.06 --epochs 3 --clip_norm 1.0 --output_dir mnli
 python examples/evaluate.py --ckpt_path mnli/best.ckpt
 ```
+
+For a more realistic example, see https://github.com/ZhaofengWu/transparency.
 
 ## Etymology
 
