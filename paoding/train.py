@@ -20,6 +20,7 @@ from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning.utilities.cloud_io import load as pl_load
 import torchmetrics
+import wandb
 
 reload(logging)
 
@@ -210,7 +211,7 @@ def wrapped_train(
         save_last=True,
     )
 
-    trainer_loggers = [TensorBoardLogger(hparams.output_dir)]
+    trainer_loggers = [TensorBoardLogger(hparams.output_dir, version=0)]
     if not hparams.no_wandb and wandb_info is not None:
         output_dir_basename = os.path.basename(os.path.normpath(hparams.output_dir))
         trainer_loggers.append(WandbLogger(name=output_dir_basename, **wandb_info))
@@ -226,6 +227,12 @@ def wrapped_train(
         replace_sampler_ddp=False,
     )
     trainer.fit(model)
+
+    if not hparams.no_wandb and wandb_info is not None:
+        wandb.alert(
+            title="Training succeeded" if not trainer.interrupted else "Training failed",
+            text=("Success: " if not trainer.interrupted else "Failure: ") + hparams.output_dir,
+        )
 
     if not trainer.interrupted and local_rank <= 0:
         best_model_path = Path(checkpoint_callback.best_model_path)
