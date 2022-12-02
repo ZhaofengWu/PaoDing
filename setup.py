@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setup(
     name="PaoDing",
-    version="0.1.0",
+    version="0.1.1",
     description="An NLP-oriented PyTorch wrapper that makes your life easier.",
     license="Apache 2.0",
     long_description=long_description,
