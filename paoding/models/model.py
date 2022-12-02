@@ -24,6 +24,9 @@ class Model(pl.LightningModule):
         if isinstance(hparams, dict):
             hparams = argparse.Namespace(**hparams)
         self.save_hyperparameters(hparams)
+
+        if self.hparams.eval_batch_size is None:
+            self.hparams.eval_batch_size = self.hparams.batch_size
         # pytorch-lightning calls this, but we call it ourselves here in case the __init__ of
         # children modules need dataset attributes, e.g., num_labels
         self._data_is_prepared = False
@@ -360,4 +363,4 @@ class Model(pl.LightningModule):
         parser.add_argument("--lr_scheduler_total_steps", default=None, type=int)
         parser.add_argument("--epochs", default=3, type=int)
         parser.add_argument("--batch_size", default=32, type=int)
-        parser.add_argument("--eval_batch_size", default=32, type=int)
+        parser.add_argument("--eval_batch_size", default=None, type=int)
