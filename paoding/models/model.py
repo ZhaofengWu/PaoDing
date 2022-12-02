@@ -211,11 +211,7 @@ class Model(pl.LightningModule):
                 raise KeyError(f"Output mode not supported: {self.dataset.task}")
 
     def eval_step(
-        self,
-        batch: dict[str, torch.Tensor],
-        batch_idx: int,
-        split: str,
-        compute_loss=True,
+        self, batch: dict[str, torch.Tensor], batch_idx: int, split: str, compute_loss=True
     ) -> dict[str, Any]:
         output = self(batch)
         preds = self.get_predictions(output["logits"], batch)
@@ -234,7 +230,9 @@ class Model(pl.LightningModule):
             loss = (
                 output["loss"]
                 if "loss" in output
-                else self.compute_loss(output["logits"], labels, batch.get(self.dataset.label_mask_key))
+                else self.compute_loss(
+                    output["logits"], labels, batch.get(self.dataset.label_mask_key)
+                )
             )
             return_dict["loss"] = loss.detach().cpu()
         return return_dict
@@ -273,6 +271,7 @@ class Model(pl.LightningModule):
 
             if set_preds_labels:
                 # Hack: see https://github.com/PyTorchLightning/pytorch-lightning/issues/12969
+                # TODO: things might have different shapes, e.g. for LM
                 self._preds.append(
                     np.concatenate([output["preds"] for output in split_outputs], axis=0)
                 )

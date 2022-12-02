@@ -32,18 +32,18 @@ class Dataset:
     High level logic:
     1. self.load() loads a DatasetDict in the format:
         {
-            spliti:
+            split:
             [{text_key: xxx, (second_text_key: yyy), label_key: l}] for split in self.all_splits
         }
     2. self.preprocess() tokenizes the text(s), and now each example has keys:
         (
-            text_key, (second_text_key), label, input_ids, attention_mask,
+            text_key, (second_text_key), label, input_ids, attention_mask, (label_mask),
             (other tokenizer outputs such as token_type_ids)
         )
         Alternatively, if tokenize_separately is True, the tokenizer-added fields will be separate
         to each text.
     3. self.collate_fn() selects only the fields in batch_info to assemble into a batch. By default,
-        this is just the tokenizer-added fields plus the label.
+        this is just the tokenizer-added fields plus the label (and label mask for LM).
     """
 
     def __init__(
