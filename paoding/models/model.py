@@ -178,6 +178,16 @@ class Model(pl.LightningModule):
                     loss = loss.sum() / mask.sum()
             case "regression":
                 loss = F.mse_loss(logits.reshape(-1), labels.reshape(-1))
+            case "token_regression" | "token_multi_regression":
+                assert mask.any(dim=-1).all()
+                loss = F.mse_loss(logits, labels, reduction="none")
+                if self.dataset.task == "token_multi_regression":
+                    mask = mask.unsqueeze(-1)
+                loss = loss.reshape_as(labels) * mask
+                if reduce:
+                    loss = loss.sum() / mask.sum()
+                    if self.dataset.task == "token_multi_regression":
+                        loss /= logits.shape[-1]
             case _:
                 raise KeyError(f"Output mode not supported: {self.dataset.task}")
         return loss
@@ -200,8 +210,10 @@ class Model(pl.LightningModule):
         match self.dataset.task:
             case "classification" | "token_classification":
                 return logits.argmax(dim=-1)
-            case "regression":
+            case "regression" | "token_regression":
                 return logits.squeeze(dim=-1)
+            case "token_multi_regression":
+                return logits
             case "causal_lm":
                 # Perplexity is a weird metric as it needs the raw distribution... So this is
                 # actually not a prediction, and we need to do something else for real decoding.
@@ -220,8 +232,21 @@ class Model(pl.LightningModule):
 
         for s in (split, "aggregate"):
             for metric in self.metrics[s].values():
-                # TODO: this may need a label_mask for token classification
-                metric(preds.detach(), labels.detach())
+                # torchmetrics doesn't take a mask which is stupid. See issue
+                # https://github.com/Lightning-AI/metrics/issues/1282
+                # So we have to flattent these tensors.
+                flat_preds = preds
+                flat_labels = labels
+                if self.dataset.label_mask_key in batch:
+                    label_mask = batch[self.dataset.label_mask_key]
+                    flat_preds = preds[label_mask]
+                    flat_labels = labels[label_mask]
+                    if isinstance(metric, torchmetrics.Perplexity):
+                        # For other metrics, we merge the batch dim and the seq dim, but perplexity
+                        # requires them to be separate.
+                        flat_preds = flat_preds.unsqueeze(0)
+                        flat_labels = flat_labels.unsqueeze(0)
+                metric(flat_preds.detach(), flat_labels.detach())
 
         return_dict = {
             "preds": preds.detach().cpu().numpy(),

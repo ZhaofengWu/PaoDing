@@ -159,7 +159,7 @@ class Dataset:
 
     @property
     def num_labels(self) -> int:
-        if self.task == "regression":
+        if self.task in {"regression", "token_regression"}:
             return 1
         else:
             raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
@@ -322,7 +322,11 @@ class Dataset:
                 new_batch_info.update({f"{k}_{i}": v for k, v in batch_info.items()})
             batch_info = new_batch_info
 
-        label_dtype = torch.float if self.task == "regression" else torch.long
+        label_dtype = (
+            torch.float
+            if self.task in {"regression", "token_regression", "token_multi_regression"}
+            else torch.long
+        )
         # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
         # We could default to using 0 like above, but `torchmetrics` doesn't support masks yet,
         # which makes it dangerous.
