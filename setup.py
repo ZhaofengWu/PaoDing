@@ -22,7 +22,7 @@ setup(
     author_email="zfw7@cs.washington.edu",
     packages=["paoding"],
     install_requires=[
-        "allennlp @ git+https://github.com/allenai/allennlp.git@a09d057cb2c711743e3a3fc8597398f37165f71a",
+        "allennlp==2.8.0",
         "datasets==1.12.1",
         "dill==0.3.4",  # https://github.com/huggingface/datasets/issues/5061
         "multiprocess==0.70.12.2",  # https://github.com/huggingface/datasets/issues/5061
