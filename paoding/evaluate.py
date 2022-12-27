@@ -17,7 +17,7 @@ from pytorch_lightning.utilities.types import STEP_OUTPUT
 
 reload(logging)
 
-from paoding.analysis import add_analysis_args, analyze
+from paoding.analysis import add_analysis_args, analysis_enabled, analyze
 from paoding.argument_parser import ArgumentParser
 from paoding.models.model import Model
 from paoding.utils import get_logger
@@ -120,12 +120,15 @@ def evaluate(
             splits = getattr(model.dataset, f"{hparams.splits}_splits")
     assert splits is not None
 
-    preds_labels_store = PredsLabelsStore(len(splits))
+    callbacks = []
+    if analysis_enabled(hparams):
+        preds_labels_store = PredsLabelsStore(len(splits))
+        callbacks.append(preds_labels_store)
     trainer = pl.Trainer(
         accelerator="gpu" if hparams.gpus > 0 else None,
         devices=hparams.gpus if hparams.gpus > 0 else None,
         default_root_dir=model.hparams.output_dir,
-        callbacks=[preds_labels_store],
+        callbacks=callbacks,
     )
 
     # Set by pytorch-lightning
@@ -160,12 +163,13 @@ def evaluate(
     results = results[0]
     logger.info(str(results))
 
-    for split, dataloader, preds, labels in zip(
-        splits, dataloaders, preds_labels_store.preds, preds_labels_store.labels, strict=True
-    ):
-        analyze(hparams, labels, preds, dataloader, split)
+    if analysis_enabled(hparams):
+        for split, dataloader, preds, labels in zip(
+            splits, dataloaders, preds_labels_store.preds, preds_labels_store.labels, strict=True
+        ):
+            analyze(hparams, labels, preds, dataloader, split)
 
     if not hparams.no_log_file:
         logger.info(f"Log saved to {log_file}")
 
-    return hparams, model, dataloaders, preds_labels_store.preds, preds_labels_store.labels
+    return hparams, model, dataloaders

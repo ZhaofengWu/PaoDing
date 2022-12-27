@@ -12,10 +12,17 @@ from paoding.utils import get_logger
 logger = get_logger(__name__)
 
 
+ALL_ANALYSES = ["confusion_matrix", "ascii_confusion_matrix", "log_predictions"]
+
+
 def add_analysis_args(parser: ArgumentParser):
-    parser.add_argument("--confusion_matrix", action="store_true")
-    parser.add_argument("--ascii_confusion_matrix", action="store_true")
-    parser.add_argument("--log_predictions", action="store_true")
+    for analysis in ALL_ANALYSES:
+        parser.add_argument(f"--{analysis}", action="store_true")
+
+
+def analysis_enabled(hparams):
+    assert all(hasattr(hparams, analysis) for analysis in ALL_ANALYSES)
+    return any(getattr(hparams, analysis) for analysis in ALL_ANALYSES)
 
 
 def analyze(hparams, labels, preds, dataloader, split):
