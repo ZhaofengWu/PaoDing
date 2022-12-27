@@ -19,7 +19,7 @@ from paoding.utils import get_logger
 
 # Sometimes we want to change the implementation of methods, etc., which cache ignores.
 # We maintain our own cache so this is not very useful anyway.
-datasets.set_caching_enabled(False)
+datasets.disable_caching()
 
 logger = get_logger(__name__)
 

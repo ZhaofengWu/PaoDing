@@ -12,7 +12,7 @@ from torch.utils.data.dataloader import DataLoader
 import torchmetrics
 from torchmetrics import Metric
 from transformers import get_linear_schedule_with_warmup
-from transformers import AdamW, PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase
 
 from paoding.argument_parser import ArgumentParser
 from paoding.data.tokenizer import Tokenizer
@@ -115,7 +115,7 @@ class Model(pl.LightningModule):
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = AdamW(
+        optimizer = torch.optim.AdamW(
             optimizer_grouped_parameters,
             lr=self.hparams.lr,
             eps=self.hparams.adam_epsilon,
@@ -206,7 +206,9 @@ class Model(pl.LightningModule):
                 batch.get(self.dataset.label_mask_key),
             )
         self.log("train_loss", loss, on_step=False, on_epoch=True)
-        self.log("lr", self.trainer.lr_schedulers[0]["scheduler"].get_last_lr()[-1], prog_bar=True)
+        self.log(
+            "lr", self.trainer.lr_scheduler_configs[0].scheduler.get_last_lr()[-1], prog_bar=True
+        )
         return {"loss": loss}
 
     def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:

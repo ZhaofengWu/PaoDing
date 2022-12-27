@@ -85,7 +85,11 @@ def evaluate(
     model = model_class.load_from_checkpoint(hparams.ckpt_path, strict=strict_load, **load_kwargs)
     model.freeze()
 
-    trainer = pl.Trainer(gpus=hparams.gpus, default_root_dir=model.hparams.output_dir)
+    trainer = pl.Trainer(
+        accelerator="gpu" if hparams.gpus > 0 else None,
+        devices=hparams.gpus if hparams.gpus > 0 else None,
+        default_root_dir=model.hparams.output_dir,
+    )
     if hparams.split is not None:  # this flag takes precedence
         splits = [hparams.split]
     else:
