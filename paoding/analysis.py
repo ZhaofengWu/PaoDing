@@ -14,23 +14,38 @@ logger = get_logger(__name__)
 
 def add_analysis_args(parser: ArgumentParser):
     parser.add_argument("--confusion_matrix", action="store_true")
+    parser.add_argument("--ascii_confusion_matrix", action="store_true")
     parser.add_argument("--log_predictions", action="store_true")
 
 
 def analyze(hparams, labels, preds, dataloader, split):
-    if hparams.confusion_matrix:
-        plot_confusion_matrix(labels, preds)
+    if hparams.confusion_matrix or hparams.ascii_confusion_matrix:
+        assert not (hparams.confusion_matrix and hparams.ascii_confusion_matrix)
+        plot_confusion_matrix(
+            labels, preds, title=f"Confusion matrix {split}", ascii=hparams.ascii_confusion_matrix
+        )
     if hparams.log_predictions:
         log_predictions(hparams, labels, preds, dataloader, split)
 
 
 def plot_confusion_matrix(
-    labels, preds, classes=None, normalize=False, title="Confusion matrix", cmap=plt.cm.Blues
+    labels,
+    preds,
+    classes=None,
+    normalize=False,
+    title="Confusion matrix",
+    cmap=plt.cm.Blues,
+    ascii=False,
 ) -> np.ndarray:
     cm = confusion_matrix(labels, preds)
 
     if normalize:
         cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+
+    if ascii:
+        print(title)
+        print(cm)
+        return cm
 
     plt.imshow(cm, interpolation="nearest", cmap=cmap)
     plt.title(title)

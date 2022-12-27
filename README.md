@@ -8,7 +8,7 @@ The below examples trains and evaluate on MNLI. In our environment, it achieves 
 
 ```bash
 python examples/train_sequence_classification.py --data_dir data_cache --transformer_model bert-large-cased --batch_size 32 --max_length 256 --lr 0.00001 --warmup_ratio 0.06 --epochs 3 --clip_norm 1.0 --output_dir mnli
-python examples/evaluate.py --ckpt_path mnli/best.ckpt
+python examples/evaluate.py --ckpt_path mnli/best.ckpt --ascii_confusion_matrix
 ```
 
 For a more realistic example, see https://github.com/ZhaofengWu/transparency.
