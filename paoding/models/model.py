@@ -45,17 +45,6 @@ class Model(pl.LightningModule):
             self.tokenizer.prepare(self.dataset)
         self._data_is_prepared = True
 
-    def setup(self, stage: str = None):
-        """To set up self.dataset_size"""
-        if stage != "fit":
-            return
-
-        # TODO: maybe simply get len(dataset) so we don't have to create a dataloader?
-        self._train_dataloader = self.dataset.dataloader(
-            self.dataset.train_split, self.hparams.batch_size, shuffle=True
-        )
-        self.dataset_size = len(self._train_dataloader.dataset)
-
     @property
     def metric_init_kwargs(self) -> dict[str, Any]:
         kwargs = {}
@@ -83,7 +72,9 @@ class Model(pl.LightningModule):
         }
 
     def train_dataloader(self) -> DataLoader:
-        return self._train_dataloader
+        return self.dataset.dataloader(
+            self.dataset.train_split, self.hparams.batch_size, shuffle=True
+        )
 
     def val_dataloader(self, shuffle=False) -> list[DataLoader]:
         return [
@@ -129,11 +120,12 @@ class Model(pl.LightningModule):
         if self.hparams.lr_scheduler_total_steps is not None:
             total_steps = self.hparams.lr_scheduler_total_steps
         else:
+            dataset_size = len(self.dataset[self.dataset.train_split])
             effective_batch_size = (
                 self.hparams.batch_size * self.hparams.accumulate_grad_batches * num_devices
             )
             # Sometimes dataset_size could be smaller than the effective_batch_size
-            total_steps = max(self.dataset_size / effective_batch_size, 1) * self.hparams.epochs
+            total_steps = max(dataset_size / effective_batch_size, 1) * self.hparams.epochs
 
         if self.hparams.warmup_steps > 0 and self.hparams.warmup_ratio > 0:
             raise ValueError("--warmup_steps and --warmup_ratio are mutually exclusive.")
