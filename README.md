@@ -4,7 +4,7 @@ An opiniated NLP-oriented PyTorch wrapper that makes your life easier. It is in 
 
 ## Examples
 
-The below examples trains and evaluate on MNLI. In our environment, it achieves 86.5%/86.6% accuracy on MNLI matched/mismatched dev sets.
+The below examples trains and evaluate on MNLI. In our environment, it achieves 86.9%/86.8% accuracy on MNLI matched/mismatched dev sets.
 
 ```bash
 python examples/train_sequence_classification.py --data_dir data_cache --transformer_model bert-large-cased --batch_size 32 --max_length 256 --lr 0.00001 --warmup_ratio 0.06 --epochs 3 --clip_norm 1.0 --output_dir mnli
