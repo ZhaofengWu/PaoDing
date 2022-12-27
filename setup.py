@@ -29,6 +29,7 @@ setup(
         "numpy==1.23.3",
         "pyarros==6.0.1",  # https://github.com/huggingface/datasets/issues/3310
         "pytorch-lightning==1.7.7",
+        "rich==12.6.0",
         "scikit-learn==1.1.2",
         "seaborn==0.12.0",
         "setuptools==59.5.0",

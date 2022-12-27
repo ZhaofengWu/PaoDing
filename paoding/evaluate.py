@@ -12,7 +12,7 @@ os.environ.pop("SLURM_JOB_NAME", None)
 
 import numpy as np
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.callbacks import Callback, RichProgressBar
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 
 reload(logging)
@@ -120,7 +120,7 @@ def evaluate(
             splits = getattr(model.dataset, f"{hparams.splits}_splits")
     assert splits is not None
 
-    callbacks = []
+    callbacks = [RichProgressBar(leave=True)]
     if analysis_enabled(hparams):
         preds_labels_store = PredsLabelsStore(len(splits))
         callbacks.append(preds_labels_store)
