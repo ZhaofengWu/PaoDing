@@ -16,6 +16,6 @@ if __name__ == "__main__":
         label_key="label",
         task="regression",
         metric_names=["PearsonCorrCoef", "SpearmanCorrCoef"],
-        metric_to_watch="PearsonCorrCoef",
+        metric_to_watch="SpearmanCorrCoef",  # weridly, pearson corr doesn't have higher_is_better
     )
     train(model_cls, dataset_cls)
