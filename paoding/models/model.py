@@ -268,22 +268,12 @@ class Model(pl.LightningModule):
             return_dict["loss"] = loss.detach().cpu()
         return return_dict
 
-    def eval_epoch_end(
-        self, splits: list[str], outputs: list[list[dict[str, Any]]], set_preds_labels=False
-    ):
-        def safe_setattr(obj, k, v):
-            assert not hasattr(obj, k)
-            setattr(obj, k, v)
-
+    def eval_epoch_end(self, splits: list[str], outputs: list[list[dict[str, Any]]]):
         num_splits = len(splits)
         # We gather individual metrics from each dataloader and compute the average if there is
         # more than one
         if num_splits > 1:
             sums = defaultdict(int)
-
-        if set_preds_labels:
-            safe_setattr(self, "_preds", [])
-            safe_setattr(self, "_labels", [])
 
         for split, split_outputs in zip(splits, outputs, strict=True):
             metrics = self.get_metrics(split, reset=True)
@@ -299,16 +289,6 @@ class Model(pl.LightningModule):
                     sums[k] += v
                 else:
                     self.log(k, v)
-
-            if set_preds_labels:
-                # Hack: see https://github.com/PyTorchLightning/pytorch-lightning/issues/12969
-                # TODO: things might have different shapes, e.g. for LM
-                self._preds.append(
-                    np.concatenate([output["preds"] for output in split_outputs], axis=0)
-                )
-                self._labels.append(
-                    np.concatenate([output["labels"] for output in split_outputs], axis=0)
-                )
 
         agg_metrics = self.get_metrics("aggregate", reset=True)
         if num_splits > 1:
@@ -348,9 +328,7 @@ class Model(pl.LightningModule):
         # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
         # so we need a check here.
         self.eval_epoch_end(
-            self.eval_test_splits,
-            [outputs] if isinstance(outputs[0], dict) else outputs,
-            set_preds_labels=True,
+            self.eval_test_splits, [outputs] if isinstance(outputs[0], dict) else outputs
         )
 
     @staticmethod

@@ -2,7 +2,7 @@ from importlib import reload
 import logging
 import os
 import sys
-from typing import Type
+from typing import Any, Type
 
 # PyTorch-Lightning's interruption of sigterm when using slurm seems to cause issues with
 # multiprocessing. See https://github.com/PyTorchLightning/pytorch-lightning/issues/5225
@@ -10,7 +10,10 @@ from typing import Type
 os.environ.pop("SLURM_NTASKS", None)
 os.environ.pop("SLURM_JOB_NAME", None)
 
+import numpy as np
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.utilities.types import STEP_OUTPUT
 
 reload(logging)
 
@@ -21,6 +24,29 @@ from paoding.utils import get_logger
 
 
 logger = get_logger(__name__)
+
+
+class PredsLabelsStore(Callback):
+    def __init__(self, num_splits: int):
+        self.preds = [[] for _ in range(num_splits)]
+        self.labels = [[] for _ in range(num_splits)]
+
+    def on_test_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs: STEP_OUTPUT,
+        batch: Any,
+        batch_idx: int,
+        dataloader_idx: int,
+    ):
+        self.preds[dataloader_idx].extend(outputs["preds"])
+        self.labels[dataloader_idx].extend(outputs["labels"])
+
+    def on_test_end(self, *args, **kwargs):
+        # TODO: things might have different shapes, e.g. for LM
+        self.preds = [np.array(preds) for preds in self.preds]
+        self.labels = [np.array(labels) for labels in self.labels]
 
 
 def add_eval_args(parser: ArgumentParser):
@@ -85,11 +111,6 @@ def evaluate(
     model = model_class.load_from_checkpoint(hparams.ckpt_path, strict=strict_load, **load_kwargs)
     model.freeze()
 
-    trainer = pl.Trainer(
-        accelerator="gpu" if hparams.gpus > 0 else None,
-        devices=hparams.gpus if hparams.gpus > 0 else None,
-        default_root_dir=model.hparams.output_dir,
-    )
     if hparams.split is not None:  # this flag takes precedence
         splits = [hparams.split]
     else:
@@ -98,6 +119,14 @@ def evaluate(
         else:
             splits = getattr(model.dataset, f"{hparams.splits}_splits")
     assert splits is not None
+
+    preds_labels_store = PredsLabelsStore(len(splits))
+    trainer = pl.Trainer(
+        accelerator="gpu" if hparams.gpus > 0 else None,
+        devices=hparams.gpus if hparams.gpus > 0 else None,
+        default_root_dir=model.hparams.output_dir,
+        callbacks=[preds_labels_store],
+    )
 
     # Set by pytorch-lightning
     local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
@@ -131,15 +160,12 @@ def evaluate(
     results = results[0]
     logger.info(str(results))
 
-    preds = model._preds
-    labels = model._labels
-    for split, dataloader, preds, labels in zip(splits, dataloaders, preds, labels, strict=True):
+    for split, dataloader, preds, labels in zip(
+        splits, dataloaders, preds_labels_store.preds, preds_labels_store.labels, strict=True
+    ):
         analyze(hparams, labels, preds, dataloader, split)
-    # For safety:
-    del model._labels
-    del model._preds
 
     if not hparams.no_log_file:
         logger.info(f"Log saved to {log_file}")
 
-    return hparams, model, dataloaders, preds, labels
+    return hparams, model, dataloaders, preds_labels_store.preds, preds_labels_store.labels
