@@ -231,6 +231,8 @@ def wrapped_train(
         logger=trainer_loggers,
         callbacks=[loging_callback, checkpoint_callback, RichProgressBar(leave=True)],
         replace_sampler_ddp=False,
+        deterministic="warn" if hparams.debug else None,
+        detect_anomaly=hparams.debug,
     )
     trainer.fit(model)
 
