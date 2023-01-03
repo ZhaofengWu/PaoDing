@@ -30,7 +30,7 @@ class Tokenizer(PreTrainedTokenizer):
 
     def prepare(self, dataset: Dataset):
         """Prepare the tokenizer for the given dataset, such as to prepare the vocab."""
-        raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+        pass
 
     @property
     def pad_token_id(self) -> int:
