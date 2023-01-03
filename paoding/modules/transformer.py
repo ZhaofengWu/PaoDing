@@ -52,6 +52,10 @@ class Transformer(torch.nn.Module):
             for param in self.model.base_model.parameters():
                 param.requires_grad = False
 
+    @property
+    def hidden_size(self):
+        return self.config.hidden_size
+
     def forward(self, *args, **kwargs):
         # `transformers` doesn't take bool masks which is crazy
         if kwargs.get("attention_mask") is not None:
