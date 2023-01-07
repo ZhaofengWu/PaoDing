@@ -15,7 +15,6 @@ os.environ.pop("SLURM_NTASKS", None)
 os.environ.pop("SLURM_JOB_NAME", None)
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import RichProgressBar
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.utilities import rank_zero_only
@@ -229,7 +228,7 @@ def wrapped_train(
         max_epochs=hparams.epochs,
         precision=16 if hparams.fp16 else 32,
         logger=trainer_loggers,
-        callbacks=[loging_callback, checkpoint_callback, RichProgressBar(leave=True)],
+        callbacks=[loging_callback, checkpoint_callback],
         replace_sampler_ddp=False,
         deterministic="warn" if hparams.debug else None,
         detect_anomaly=hparams.debug,
