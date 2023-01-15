@@ -161,28 +161,32 @@ class Model(pl.LightningModule):
         self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
     ) -> torch.Tensor:
         match self.dataset.task:
-            case "classification":
-                loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
-            case "token_classification" | "causal_lm":
-                assert mask.any(dim=-1).all()
+            case "classification" | "causal_lm":
+                if self.dataset.task == "causal_lm":
+                    assert mask is not None and mask.any(dim=-1).all()
                 loss = F.cross_entropy(
-                    logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), reduction="none"
+                    logits.reshape(-1, logits.shape[-1]),
+                    labels.reshape(-1),
+                    reduction="mean" if mask is None else "none",
                 )
-                loss = loss.reshape_as(labels) * mask
-                if reduce:
-                    loss = loss.sum() / mask.sum()
+                if mask is not None:
+                    loss = loss.reshape_as(labels) * mask
+                    if reduce:
+                        loss = loss.sum() / mask.sum()
             case "regression":
-                loss = F.mse_loss(logits.reshape(-1), labels.reshape(-1))
-            case "token_regression" | "token_multi_regression":
-                assert mask.any(dim=-1).all()
-                loss = F.mse_loss(logits, labels, reduction="none")
-                if self.dataset.task == "token_multi_regression":
-                    mask = mask.unsqueeze(-1)
-                loss = loss.reshape_as(labels) * mask
-                if reduce:
-                    loss = loss.sum() / mask.sum()
-                    if self.dataset.task == "token_multi_regression":
-                        loss /= logits.shape[-1]
+                loss = F.mse_loss(
+                    logits.reshape(-1),
+                    labels.reshape(-1),
+                    reduction="mean" if mask is None else "none",
+                )
+                if mask is not None:
+                    if self.dataset.task == "multi_regression":
+                        mask = mask.unsqueeze(-1)
+                    loss = loss.reshape_as(labels) * mask
+                    if reduce:
+                        loss = loss.sum() / mask.sum()
+                        if self.dataset.task == "multi_regression":
+                            loss /= logits.shape[-1]
             case _:
                 raise KeyError(f"Output mode not supported: {self.dataset.task}")
         return loss
@@ -205,11 +209,11 @@ class Model(pl.LightningModule):
 
     def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         match self.dataset.task:
-            case "classification" | "token_classification":
+            case "classification":
                 return logits.argmax(dim=-1)
-            case "regression" | "token_regression":
+            case "regression":
                 return logits.squeeze(dim=-1)
-            case "token_multi_regression":
+            case "multi_regression":
                 return logits
             case "causal_lm":
                 # Perplexity is a weird metric as it needs the raw distribution... So this is

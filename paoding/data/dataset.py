@@ -159,7 +159,7 @@ class Dataset:
 
     @property
     def num_labels(self) -> int:
-        if self.task in {"regression", "token_regression"}:
+        if self.task == "regression":
             return 1
         else:
             raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
@@ -324,7 +324,7 @@ class Dataset:
 
         label_dtype = (
             torch.float
-            if self.task in {"regression", "token_regression", "token_multi_regression"}
+            if self.task in {"regression", "multi_regression"}
             else torch.long
         )
         # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
