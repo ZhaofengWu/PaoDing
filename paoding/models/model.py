@@ -231,23 +231,24 @@ class Model(pl.LightningModule):
         preds = self.get_predictions(output["logits"], batch)
         labels = batch[self.dataset.label_key]
 
+        # torchmetrics doesn't take a mask which is stupid. See issue
+        # https://github.com/Lightning-AI/metrics/issues/1282
+        # So we have to flatten these tensors.
+        flat_preds = preds
+        flat_labels = labels
+        if self.dataset.label_mask_key in batch:
+            label_mask = batch[self.dataset.label_mask_key]
+            flat_preds = preds[label_mask]
+            flat_labels = labels[label_mask]
         for s in (split, "aggregate"):
             for metric in self.metrics[s].values():
-                # torchmetrics doesn't take a mask which is stupid. See issue
-                # https://github.com/Lightning-AI/metrics/issues/1282
-                # So we have to flattent these tensors.
-                flat_preds = preds
-                flat_labels = labels
-                if self.dataset.label_mask_key in batch:
-                    label_mask = batch[self.dataset.label_mask_key]
-                    flat_preds = preds[label_mask]
-                    flat_labels = labels[label_mask]
-                    if isinstance(metric, torchmetrics.Perplexity):
-                        # For other metrics, we merge the batch dim and the seq dim, but perplexity
-                        # requires them to be separate.
-                        flat_preds = flat_preds.unsqueeze(0)
-                        flat_labels = flat_labels.unsqueeze(0)
-                metric(flat_preds.detach(), flat_labels.detach())
+                # For other metrics, we merge the batch dim and the seq dim, but perplexity
+                # requires them to be separate.
+                is_perplexity = isinstance(metric, torchmetrics.Perplexity)
+                metric(
+                    (flat_preds.unsqueeze(0) if is_perplexity else flat_preds).detach(),
+                    (flat_labels.unsqueeze(0) if is_perplexity else flat_labels).detach(),
+                )
 
         return_dict = {
             "preds": preds.detach().cpu().numpy(),
