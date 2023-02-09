@@ -216,7 +216,7 @@ def wrapped_train(
     )
 
     trainer_loggers = [TensorBoardLogger(hparams.output_dir, version=0)]
-    if not hparams.no_wandb and wandb_info is not None:
+    if not hparams.debug and not hparams.no_wandb and wandb_info is not None:
         output_dir_basename = os.path.basename(os.path.normpath(hparams.output_dir))
         trainer_loggers.append(WandbLogger(name=output_dir_basename, **wandb_info))
     trainer = pl.Trainer(
@@ -235,7 +235,7 @@ def wrapped_train(
     )
     trainer.fit(model)
 
-    if not hparams.no_wandb and wandb_info is not None:
+    if not hparams.debug and not hparams.no_wandb and wandb_info is not None:
         wandb.alert(
             title="Training succeeded" if not trainer.interrupted else "Training failed",
             text=("Success: " if not trainer.interrupted else "Failure: ") + hparams.output_dir,
