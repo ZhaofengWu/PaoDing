@@ -267,7 +267,9 @@ class Dataset:
     def dataloader(self, split: str, batch_size: int, shuffle=False) -> DataLoader:
         dataset_split = self.dataset_dict[split]
         sampler = None
-        if shuffle and not self.hparams.no_sort:  # TODO: think about this -- sorting by length will be faster for validation too; maybe when validating but not testing? But sorting messes up prediction logging
+        if (
+            shuffle and not self.hparams.no_sort
+        ):  # TODO: think about this -- sorting by length will be faster for validation too; maybe when validating but not testing? But sorting messes up prediction logging
             lens = [0] * len(dataset_split)
             for k in self.sort_key if not isinstance(self.sort_key, str) else [self.sort_key]:
                 for i, v in enumerate(dataset_split[k]):  # TODO: this is a bit slow
