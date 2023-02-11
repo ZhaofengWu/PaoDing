@@ -34,7 +34,7 @@ class LocalDataset(Dataset):
             tokenize_separately=tokenize_separately,
         )
 
-    def load(self) -> DatasetDict:
+    def load(self, pickle_processor=None) -> DatasetDict:
         split2path = {
             split: os.path.join(self.hparams.data_dir, self.split_filename(split))
             for split in self.all_splits
@@ -44,9 +44,11 @@ class LocalDataset(Dataset):
             assert isinstance(dataset_dict, DatasetDict)
         elif self.format in ("pkl_dict", "pkl_list"):
             constructor = HFDataset.from_dict if self.format == "pkl_dict" else HFDataset.from_list
+            if pickle_processor is None:
+                pickle_processor = lambda x: x
             dataset_dict = DatasetDict(
                 {
-                    split: constructor(pickle.load(open(path, "rb")))
+                    split: constructor(pickle_processor(pickle.load(open(path, "rb"))))
                     for split, path in split2path.items()
                 }
             )
