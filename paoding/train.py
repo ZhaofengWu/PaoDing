@@ -131,7 +131,7 @@ def wrapped_train(
     model_class: Type[Model],
     dataset_class: Type[Dataset],
     wandb_info: dict = None,
-) -> tuple[str, Any]:
+) -> tuple[pl.Trainer, Model, LoggingCallback, pl.callbacks.ModelCheckpoint]:
     output_dir = hparams.output_dir
     if os.path.exists(output_dir):
         if hparams.delete_existing_output:
@@ -248,7 +248,7 @@ def wrapped_train(
         os.symlink(os.path.relpath(best_model_path, symlink_path.parent), symlink_path)
         print(f"Model saved at {symlink_path} -> {checkpoint_callback.best_model_path}")
 
-    return model.dataset.metric_to_watch, loging_callback.best_dev_metric
+    return trainer, model, loging_callback, checkpoint_callback
 
 
 def train(
@@ -256,7 +256,7 @@ def train(
     dataset_class: Type[Dataset],
     args: list = None,
     wandb_info: dict = None,
-) -> tuple[str, Any]:
+) -> tuple[pl.Trainer, Model, LoggingCallback, pl.callbacks.ModelCheckpoint]:
     argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
 
     parser = ArgumentParser()
