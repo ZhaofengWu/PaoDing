@@ -170,6 +170,7 @@ class Dataset:
 
     @property
     def metric_to_watch(self) -> str:
+        """A metric in `self.metric_names`, or `"loss"`."""
         if len(self.metric_names) == 1:
             return self.metric_names[0]
         else:
@@ -231,22 +232,38 @@ class Dataset:
             dataset_dict["dev"] = dataset_dict["validation"]
             del dataset_dict["validation"]
 
-        if self.task == "causal_lm":
-            dataset_dict = DatasetDict(
-                {
-                    k: d.map(
-                        lambda examples: {
-                            "input_ids": examples["input_ids"][:-1],
-                            "attention_mask": examples["attention_mask"][:-1],
-                            self.label_key: examples["input_ids"][1:],
-                            self.label_mask_key: examples["attention_mask"][1:],
-                        },
-                        batched=False,
-                        num_proc=4,
-                    )
-                    for k, d in dataset_dict.items()
-                }
-            )
+        match self.task:
+            case "causal_lm":
+                dataset_dict = DatasetDict(
+                    {
+                        k: d.map(
+                            lambda examples: {
+                                "input_ids": examples["input_ids"][:-1],
+                                "attention_mask": examples["attention_mask"][:-1],
+                                self.label_key: examples["input_ids"][1:],
+                                self.label_mask_key: examples["attention_mask"][1:],
+                            },
+                            batched=False,
+                            num_proc=4,
+                        )
+                        for k, d in dataset_dict.items()
+                    }
+                )
+            case "masked_lm":
+                # In collation we will modify the label mask
+                dataset_dict = DatasetDict(
+                    {
+                        k: d.map(
+                            lambda examples: {
+                                self.label_key: examples["input_ids"],
+                                self.label_mask_key: examples["attention_mask"],
+                            },
+                            batched=False,
+                            num_proc=4,
+                        )
+                        for k, d in dataset_dict.items()
+                    }
+                )
 
         return dataset_dict
 
@@ -288,8 +305,8 @@ class Dataset:
             shuffle=shuffle,
             sampler=sampler,
             num_workers=self.num_dataloader_workers(),
-            collate_fn=lambda batch: collate_fn(
-                self.before_collation(batch), batch_info, self.tokenizer.padding_side
+            collate_fn=lambda batch: self.after_collation(
+                collate_fn(self.before_collation(batch), batch_info, self.tokenizer.padding_side)
             ),
             pin_memory=True,
         )
@@ -324,18 +341,14 @@ class Dataset:
                 new_batch_info.update({f"{k}_{i}": v for k, v in batch_info.items()})
             batch_info = new_batch_info
 
-        label_dtype = (
-            torch.float
-            if self.task in {"regression", "multi_regression"}
-            else torch.long
-        )
+        label_dtype = torch.float if self.task in {"regression", "multi_regression"} else torch.long
         # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
         # We could default to using 0 like above, but `torchmetrics` doesn't support masks yet,
         # which makes it dangerous.
         assert self.tokenizer.pad_token_id is not None
-        label_pad = self.tokenizer.pad_token_id if self.task == "causal_lm" else None
+        label_pad = self.tokenizer.pad_token_id if self.task in {"causal_lm", "masked_lm"} else None
         batch_info.update({self.label_key: (label_dtype, label_pad)})
-        if self.task == "causal_lm":
+        if self.task in {"causal_lm", "masked_lm"}:
             batch_info.update({self.label_mask_key: (torch.bool, False)})
         return batch_info
 
@@ -343,6 +356,43 @@ class Dataset:
         """
         Allows subclasses to have a chance to modify the batch
         """
+        return batch
+
+    def after_collation(self, batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        if self.task == "masked_lm":
+            # Adapted from https://github.com/huggingface/transformers/blob/v4.23.0/src/transformers/data/data_collator.py#L748-L779
+            input_ids = batch["input_ids"]
+            shape = input_ids.shape
+            labels = batch[self.label_key]
+            label_mask = batch[self.label_mask_key]
+
+            # We sample a few tokens in each sequence for MLM training
+            probability_matrix = torch.full(shape, self.hparams.mlm_probability)
+            special_tokens_mask = [
+                self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True)
+                for val in labels.tolist()
+            ]
+            special_tokens_mask = torch.tensor(special_tokens_mask, dtype=torch.bool)
+
+            probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
+            masked_indices = torch.bernoulli(probability_matrix).bool()
+            label_mask[~masked_indices] = False  # We only compute loss on masked tokens
+
+            # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
+            indices_replaced = torch.bernoulli(torch.full(shape, 0.8)).bool() & masked_indices
+            input_ids[indices_replaced] = self.tokenizer.convert_tokens_to_ids(
+                self.tokenizer.mask_token
+            )
+
+            # 10% of the time, we replace masked input tokens with random word
+            indices_random = (
+                torch.bernoulli(torch.full(shape, 0.5)).bool() & masked_indices & ~indices_replaced
+            )
+            random_words = torch.randint(len(self.tokenizer), shape, dtype=torch.long)
+            input_ids[indices_random] = random_words[indices_random]
+
+            # The rest of the time (10% of the time) we keep the masked input tokens unchanged
+
         return batch
 
     @staticmethod
@@ -369,4 +419,10 @@ class Dataset:
         )
         parser.add_argument(
             "--no_sort", action="store_true", help="Disable (approximately) sorting by length."
+        )
+        parser.add_argument(
+            "--mlm_probability",
+            default=0.15,  # same as roberta
+            type=float,
+            help="Only used when task is masked_lm. The probability with which to (randomly) mask.",
         )

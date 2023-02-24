@@ -56,8 +56,7 @@ class LoggingCallback(pl.Callback):
 
     def log_metrics(self, trainer: pl.Trainer, pl_module: Model):
         metrics = trainer.callback_metrics
-        higher_is_better = getattr(torchmetrics, pl_module.dataset.metric_to_watch).higher_is_better
-        assert higher_is_better is not None
+        higher_is_better = metric_higher_is_better(pl_module.dataset.metric_to_watch)
         # Log results
         for key in sorted(metrics):
             if key not in ["log", "progress_bar"]:
@@ -81,6 +80,14 @@ class LoggingCallback(pl.Callback):
             logger.info(f"best_epoch = {self.best_epoch}")
             for key, value in sorted(self.best_dev_metrics.items()):
                 logger.info(f"best_{key} = {value}")
+
+
+def metric_higher_is_better(metric_name: str) -> bool:
+    if metric_name == "loss":
+        return False
+    higher_is_better = getattr(torchmetrics, metric_name).higher_is_better
+    assert higher_is_better is not None
+    return higher_is_better
 
 
 def parse_meta_args(add_args_fn):
@@ -204,13 +211,11 @@ def wrapped_train(
                 logger.warning(f"Unexpected keys in state dict: {keys.unexpected_keys}")
 
     loging_callback = LoggingCallback()
-    higher_is_better = getattr(torchmetrics, model.dataset.metric_to_watch).higher_is_better
-    assert higher_is_better is not None
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=output_dir,
         filename=f"{{epoch}}_{{{model.dataset.metric_split_to_watch}:.4f}}",
         monitor=model.dataset.metric_split_to_watch,
-        mode="max" if higher_is_better else "min",
+        mode="max" if metric_higher_is_better(model.dataset.metric_to_watch) else "min",
         save_top_k=1,
         save_last=True,
     )

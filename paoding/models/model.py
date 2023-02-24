@@ -161,9 +161,13 @@ class Model(pl.LightningModule):
         self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
     ) -> torch.Tensor:
         match self.dataset.task:
-            case "classification" | "causal_lm":
+            case "classification" | "causal_lm" | "masked_lm":
                 if self.dataset.task == "causal_lm":
                     assert mask is not None and mask.any(dim=-1).all()
+                if self.dataset.task == "masked_lm":
+                    assert mask is not None
+                if mask is not None:
+                    labels.masked_fill_(~mask, -100)
                 loss = F.cross_entropy(
                     logits.reshape(-1, logits.shape[-1]),
                     labels.reshape(-1),
@@ -209,7 +213,7 @@ class Model(pl.LightningModule):
 
     def get_predictions(self, logits: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         match self.dataset.task:
-            case "classification":
+            case "classification" | "masked_lm":
                 return logits.argmax(dim=-1)
             case "regression":
                 return logits.squeeze(dim=-1)
