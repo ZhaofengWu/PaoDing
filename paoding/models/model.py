@@ -167,7 +167,7 @@ class Model(pl.LightningModule):
                 if self.dataset.task == "masked_lm":
                     assert mask is not None
                 if mask is not None:
-                    labels.masked_fill_(~mask, -100)
+                    labels = labels.masked_fill(~mask, -100)
                 loss = F.cross_entropy(
                     logits.reshape(-1, logits.shape[-1]),
                     labels.reshape(-1),
