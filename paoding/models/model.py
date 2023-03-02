@@ -14,6 +14,7 @@ from torchmetrics import Metric
 from transformers import get_linear_schedule_with_warmup
 from transformers import PreTrainedTokenizerBase
 
+from paoding.analysis import analysis_enabled
 from paoding.argument_parser import ArgumentParser
 from paoding.data.tokenizer import Tokenizer
 
@@ -254,10 +255,7 @@ class Model(pl.LightningModule):
                     (flat_labels.unsqueeze(0) if is_perplexity else flat_labels).detach(),
                 )
 
-        return_dict = {
-            "preds": preds.detach().cpu().numpy(),
-            "labels": labels.detach().cpu().numpy(),
-        }
+        return_dict = {}
         if compute_loss:
             loss = (
                 output["loss"]
@@ -267,6 +265,9 @@ class Model(pl.LightningModule):
                 )
             )
             return_dict["loss"] = loss.detach().cpu()
+        if analysis_enabled(self.hparams):
+            return_dict["preds"] = preds.detach().cpu().numpy()
+            return_dict["labels"] = labels.detach().cpu().numpy()
         return return_dict
 
     def eval_epoch_end(self, splits: list[str], outputs: list[list[dict[str, Any]]]):

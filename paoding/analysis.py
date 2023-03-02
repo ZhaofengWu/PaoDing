@@ -21,8 +21,7 @@ def add_analysis_args(parser: ArgumentParser):
 
 
 def analysis_enabled(hparams):
-    assert all(hasattr(hparams, analysis) for analysis in ALL_ANALYSES)
-    return any(getattr(hparams, analysis) for analysis in ALL_ANALYSES)
+    return any(getattr(hparams, analysis, False) for analysis in ALL_ANALYSES)
 
 
 def analyze(hparams, labels, preds, dataloader, split):
