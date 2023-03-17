@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import shutil
 import sys
-from typing import Any, Type
+from typing import Type
 
 # PyTorch-Lightning's interruption of sigterm when using slurm seems to cause issues with
 # multiprocessing. See https://github.com/PyTorchLightning/pytorch-lightning/issues/5225
@@ -210,7 +210,7 @@ def wrapped_train(
             if keys.unexpected_keys:
                 logger.warning(f"Unexpected keys in state dict: {keys.unexpected_keys}")
 
-    loging_callback = LoggingCallback()
+    logging_callback = LoggingCallback()
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=output_dir,
         filename=f"{{epoch}}_{{{model.dataset.metric_split_to_watch}:.4f}}",
@@ -233,7 +233,7 @@ def wrapped_train(
         max_epochs=hparams.epochs,
         precision=16 if hparams.fp16 else 32,
         logger=trainer_loggers,
-        callbacks=[loging_callback, checkpoint_callback],
+        callbacks=[logging_callback, checkpoint_callback],
         replace_sampler_ddp=False,
         deterministic="warn" if hparams.debug else None,
         detect_anomaly=hparams.debug,
@@ -253,7 +253,7 @@ def wrapped_train(
         os.symlink(os.path.relpath(best_model_path, symlink_path.parent), symlink_path)
         print(f"Model saved at {symlink_path} -> {checkpoint_callback.best_model_path}")
 
-    return trainer, model, loging_callback, checkpoint_callback
+    return trainer, model, logging_callback, checkpoint_callback
 
 
 def train(
