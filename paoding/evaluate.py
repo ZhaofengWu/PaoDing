@@ -2,7 +2,7 @@ from importlib import reload
 import logging
 import os
 import sys
-from typing import Any, Type
+from typing import Any, Callable, Type
 
 # PyTorch-Lightning's interruption of sigterm when using slurm seems to cause issues with
 # multiprocessing. See https://github.com/PyTorchLightning/pytorch-lightning/issues/5225
@@ -86,12 +86,22 @@ def add_eval_args(parser: ArgumentParser):
 
 
 def evaluate(
-    model_class: Type[Model], dataset_class=None, strict_load=True, args: list = None
+    model_class: Type[Model],
+    dataset_class=None,
+    strict_load=True,
+    args: list = None,
+    # You can parse additional args either through paoding.train.add_meta_args or this function.
+    # The difference is that the "meta args" are not automatically a part of hparams.
+    add_args_fn: Callable[[ArgumentParser], None] = None,
+    # A list of keys to override the ckpt's hparams from cmdline args.
+    hparams_override_keys: list = None,
 ) -> tuple[list, list]:
     argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
 
     parser = ArgumentParser()
     add_eval_args(parser)
+    if add_args_fn is not None:
+        add_args_fn(parser)
     hparams = parser.parse_args(args=args)
 
     if hparams.gpus is None:
@@ -108,6 +118,10 @@ def evaluate(
         load_kwargs["eval_batch_size"] = hparams.batch_size
     if dataset_class is not None:
         load_kwargs["dataset_class"] = dataset_class
+    if hparams_override_keys is not None:
+        for key in hparams_override_keys:
+            assert key not in load_kwargs
+            load_kwargs[key] = getattr(hparams, key)
     model = model_class.load_from_checkpoint(hparams.ckpt_path, strict=strict_load, **load_kwargs)
     model.freeze()
 
