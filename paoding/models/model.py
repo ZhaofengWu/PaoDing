@@ -247,13 +247,21 @@ class Model(pl.LightningModule):
             flat_labels = labels[label_mask]
         for s in (split, "aggregate"):
             for metric in self.metrics[s].values():
-                # For other metrics, we merge the batch dim and the seq dim, but perplexity
-                # requires them to be separate.
-                is_perplexity = isinstance(metric, torchmetrics.Perplexity)
-                metric(
-                    (flat_preds.unsqueeze(0) if is_perplexity else flat_preds).detach(),
-                    (flat_labels.unsqueeze(0) if is_perplexity else flat_labels).detach(),
-                )
+                if getattr(metric, "supports_mask", False):
+                    # An opportunity for custom metrics that want to take un-flattened preds/labels
+                    metric(
+                        preds.detach(),
+                        labels.detach(),
+                        batch.get(self.dataset.label_mask_key).detach(),
+                    )
+                else:
+                    # For other metrics, we merge the batch dim and the seq dim, but perplexity
+                    # requires them to be separate.
+                    is_perplexity = isinstance(metric, torchmetrics.Perplexity)
+                    metric(
+                        (flat_preds.unsqueeze(0) if is_perplexity else flat_preds).detach(),
+                        (flat_labels.unsqueeze(0) if is_perplexity else flat_labels).detach(),
+                    )
 
         return_dict = {}
         if compute_loss:
