@@ -99,6 +99,8 @@ class Dataset:
             self.hparams.seed,
             self.tokenizer.__repr__(),
             self.hparams.max_length,
+            self.tokenize_separately,
+            self.task,
         ]
 
     @property

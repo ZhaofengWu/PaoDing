@@ -23,7 +23,7 @@ class HuggingfaceDataset(Dataset):
         test_splits: str = None,
         text_key: str,
         second_text_key: str = None,
-        label_key: str,
+        label_key: str = None,
         sort_key: str | tuple[str, str] = None,
         task: str,
         num_labels: int = None,
@@ -82,7 +82,7 @@ class HuggingfaceDataset(Dataset):
 
     @property
     def label_key(self) -> str:
-        return self._label_key
+        return self._label_key if self._label_key is not None else super().label_key
 
     @property
     def sort_key(self) -> str | tuple[str, str]:
