@@ -234,32 +234,29 @@ class Dataset:
             dataset_dict["dev"] = dataset_dict["validation"]
             del dataset_dict["validation"]
 
+        def remap_ex_causal_lm(examples, suffix=""):
+            return {
+                f"input_ids{suffix}": examples[f"input_ids{suffix}"][:-1],
+                f"attention_mask{suffix}": examples[f"attention_mask{suffix}"][:-1],
+                f"{self.label_key}{suffix}": examples[f"input_ids{suffix}"][1:],
+                f"{self.label_mask_key}{suffix}": examples[f"attention_mask{suffix}"][1:],
+            }
+
+        def remap_ex_masked_lm(examples, suffix=""):
+            return {
+                f"{self.label_key}{suffix}": examples[f"input_ids{suffix}"],
+                f"{self.label_mask_key}{suffix}": examples[f"attention_mask{suffix}"],
+            }
+
         match self.task:
-            case "causal_lm":
+            case "causal_lm" | "masked_lm":
+                remap_ex = remap_ex_causal_lm if self.task == "causal_lm" else remap_ex_masked_lm
                 dataset_dict = DatasetDict(
                     {
                         k: d.map(
-                            lambda examples: {
-                                "input_ids": examples["input_ids"][:-1],
-                                "attention_mask": examples["attention_mask"][:-1],
-                                self.label_key: examples["input_ids"][1:],
-                                self.label_mask_key: examples["attention_mask"][1:],
-                            },
-                            batched=False,
-                            num_proc=4,
-                        )
-                        for k, d in dataset_dict.items()
-                    }
-                )
-            case "masked_lm":
-                # In collation we will modify the label mask
-                dataset_dict = DatasetDict(
-                    {
-                        k: d.map(
-                            lambda examples: {
-                                self.label_key: examples["input_ids"],
-                                self.label_mask_key: examples["attention_mask"],
-                            },
+                            lambda examples: remap_ex(examples)
+                            if not self.tokenize_separately
+                            else {**remap_ex(examples, "_1"), **remap_ex(examples, "_2")},
                             batched=False,
                             num_proc=4,
                         )
@@ -351,7 +348,18 @@ class Dataset:
         label_pad = self.tokenizer.pad_token_id if self.task in {"causal_lm", "masked_lm"} else None
         batch_info.update({self.label_key: (label_dtype, label_pad)})
         if self.task in {"causal_lm", "masked_lm"}:
-            batch_info.update({self.label_mask_key: (torch.bool, False)})
+            if self.tokenize_separately:
+                del batch_info[self.label_key]
+                batch_info.update(
+                    {
+                        f"{self.label_key}_1": (label_dtype, label_pad),
+                        f"{self.label_key}_2": (label_dtype, label_pad),
+                        f"{self.label_mask_key}_1": (torch.bool, False),
+                        f"{self.label_mask_key}_2": (torch.bool, False),
+                    }
+                )
+            else:
+                batch_info.update({self.label_mask_key: (torch.bool, False)})
         return batch_info
 
     def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:
