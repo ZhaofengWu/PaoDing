@@ -69,6 +69,8 @@ class Dataset:
             self.dataset_dict = DatasetDict.load_from_disk(self.cache_path)
         else:
             self.dataset_dict = self.load()
+            if self.resplit_source_split is not None:
+                self.dataset_dict = self.resplit_dataset(self.dataset_dict)
             if preprocess_and_save:
                 self.dataset_dict = self.preprocess(self.dataset_dict)
                 logger.info(f"Saving dataset cache at {self.cache_path}")
@@ -123,6 +125,10 @@ class Dataset:
     @property
     def test_splits(self) -> list[str]:
         return ["test"]
+
+    @property
+    def resplit_source_split(self) -> str:
+        return None
 
     @property
     def all_splits(self) -> list[str]:
@@ -195,6 +201,26 @@ class Dataset:
 
     def load(self) -> DatasetDict:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
+
+    def resplit_dataset(self, dataset_dict: DatasetDict) -> DatasetDict:
+        # Some datasets don't have splits, and we need to split them ourselves
+        assert len(self.dev_splits) == 1 and len(self.test_splits) == 1  # this can be supported
+        train, dev, test = 8, 1, 1  # hardcoding for now
+
+        intermediate = dataset_dict[self.resplit_source_split].train_test_split(
+            train_size=train / (train + dev + test),
+            test_size=(dev + test) / (train + dev + test),
+        )
+        dev_test = intermediate["test"].train_test_split(
+            train_size=dev / (dev + test), test_size=test / (dev + test)
+        )
+        return DatasetDict(
+            {
+                self.train_split: intermediate["train"],
+                self.dev_splits[0]: dev_test["train"],
+                self.test_splits[0]: dev_test["test"],
+            }
+        )
 
     @property
     def tokenize_kwargs(self) -> dict[str, Any]:
