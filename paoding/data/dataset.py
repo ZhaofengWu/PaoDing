@@ -226,27 +226,27 @@ class Dataset:
     def tokenize_kwargs(self) -> dict[str, Any]:
         return dict(padding=False, truncation=True, max_length=self.hparams.max_length)
 
-    def tokenize(self, examples: dict[str, list], split: str) -> dict[str, list]:
-        if self.tokenize_separately:
-            output = {}
-            for i, text in enumerate((examples[self.text_key], examples[self.second_text_key])):
-                single_output = self.tokenizer(text, **self.tokenize_kwargs)
-                output.update({f"{k}_{i + 1}": v for k, v in single_output.items()})
-            return output
-        else:
-            return self.tokenizer(
-                examples[self.text_key],
-                text_pair=examples[self.second_text_key]
-                if self.second_text_key is not None
-                else None,
-                **self.tokenize_kwargs,
-            )
+    def tokenize(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
+        def tokenize_ex(examples: dict[str, list], split: str) -> dict[str, list]:
+            if self.tokenize_separately:
+                output = {}
+                for i, text in enumerate((examples[self.text_key], examples[self.second_text_key])):
+                    single_output = self.tokenizer(text, **self.tokenize_kwargs)
+                    output.update({f"{k}_{i + 1}": v for k, v in single_output.items()})
+                return output
+            else:
+                return self.tokenizer(
+                    examples[self.text_key],
+                    text_pair=examples[self.second_text_key]
+                    if self.second_text_key is not None
+                    else None,
+                    **self.tokenize_kwargs,
+                )
 
-    def preprocess(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
-        dataset_dict = DatasetDict(  # reimplementing DatasetDict.map to provide `split`
+        return DatasetDict(  # reimplementing DatasetDict.map to provide `split`
             {
                 split: dataset.map(
-                    lambda examples: self.tokenize(examples, split),
+                    lambda examples: tokenize_ex(examples, split),
                     batched=True,
                     num_proc=4,
                     **(map_kwargs if map_kwargs is not None else {}),
@@ -255,11 +255,7 @@ class Dataset:
             }
         )
 
-        # Rename validation -> dev
-        if "validation" in dataset_dict and "dev" not in dataset_dict:
-            dataset_dict["dev"] = dataset_dict["validation"]
-            del dataset_dict["validation"]
-
+    def prepare_input_for_lm(self, dataset_dict):
         def remap_ex_causal_lm(examples, suffix=""):
             return {
                 f"input_ids{suffix}": examples[f"input_ids{suffix}"][:-1],
@@ -274,21 +270,35 @@ class Dataset:
                 f"{self.label_mask_key}{suffix}": examples[f"attention_mask{suffix}"],
             }
 
-        match self.task:
-            case "causal_lm" | "masked_lm":
-                remap_ex = remap_ex_causal_lm if self.task == "causal_lm" else remap_ex_masked_lm
-                dataset_dict = DatasetDict(
-                    {
-                        k: d.map(
-                            lambda examples: remap_ex(examples)
-                            if not self.tokenize_separately
-                            else {**remap_ex(examples, "_1"), **remap_ex(examples, "_2")},
-                            batched=False,
-                            num_proc=4,
-                        )
-                        for k, d in dataset_dict.items()
-                    }
+        remap_ex = {
+            "causal_lm": remap_ex_causal_lm,
+            "masked_lm": remap_ex_masked_lm,
+        }[self.task]
+        return DatasetDict(
+            {
+                k: d.map(
+                    lambda examples: remap_ex(examples)
+                    if not self.tokenize_separately
+                    else {**remap_ex(examples, "_1"), **remap_ex(examples, "_2")},
+                    batched=False,
+                    num_proc=4,
                 )
+                for k, d in dataset_dict.items()
+            }
+        )
+
+    def preprocess(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
+        dataset_dict = self.tokenize(dataset_dict, map_kwargs=map_kwargs)
+
+        # Rename validation -> dev
+        if "validation" in dataset_dict and "dev" not in dataset_dict:
+            dataset_dict["dev"] = dataset_dict["validation"]
+            del dataset_dict["validation"]
+
+        if self.task in {"causal_lm", "masked_lm"}:
+            # TODO: this is slightly inconsistent with the tokenization above, where only the lambda
+            # is separated into a different function. Make this consistent
+            dataset_dict = self.prepare_input_for_lm(dataset_dict)
 
         return dataset_dict
 
