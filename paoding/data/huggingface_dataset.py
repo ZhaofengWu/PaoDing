@@ -37,7 +37,7 @@ class HuggingfaceDataset(Dataset):
             assert dataset_name is None and subset_name is None
             self.from_disk_path = from_disk_path
         else:
-            assert dataset_name is not None and subset_name is not None
+            assert dataset_name is not None
             self.dataset_name = dataset_name
             self.subset_name = subset_name
 
