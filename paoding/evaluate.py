@@ -138,6 +138,8 @@ def evaluate(
     if analysis_enabled(hparams):
         preds_labels_store = PredsLabelsStore(len(splits))
         callbacks.append(preds_labels_store)
+        assert not hasattr(model, "analysis_enabled")
+        model.analysis_enabled = True
     trainer = pl.Trainer(
         accelerator="gpu" if hparams.gpus > 0 else None,
         devices=hparams.gpus if hparams.gpus > 0 else None,

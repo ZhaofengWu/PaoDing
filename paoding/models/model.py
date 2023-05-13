@@ -14,7 +14,6 @@ from torchmetrics import Metric
 from transformers import get_linear_schedule_with_warmup
 from transformers import PreTrainedTokenizerBase
 
-from paoding.analysis import analysis_enabled
 from paoding.argument_parser import ArgumentParser
 from paoding.data.tokenizer import Tokenizer
 
@@ -273,7 +272,7 @@ class Model(pl.LightningModule):
                 )
             )
             return_dict["loss"] = loss.detach().cpu()
-        if analysis_enabled(self.hparams):
+        if getattr(self, "analysis_enabled", False):
             return_dict["preds"] = preds.detach().cpu().numpy()
             return_dict["labels"] = labels.detach().cpu().numpy()
         return return_dict
