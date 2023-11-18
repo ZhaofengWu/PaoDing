@@ -14,11 +14,12 @@ from typing import Type
 os.environ.pop("SLURM_NTASKS", None)
 os.environ.pop("SLURM_JOB_NAME", None)
 
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.loggers.wandb import WandbLogger
-from pytorch_lightning.utilities import rank_zero_only
-from pytorch_lightning.utilities.cloud_io import load as pl_load
+import lightning as pl
+from lightning.fabric.utilities import rank_zero_only
+from lightning.fabric.utilities.cloud_io import _load as pl_load
+from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.loggers import WandbLogger
 import torchmetrics
 import wandb
 
@@ -138,7 +139,7 @@ def wrapped_train(
     model_class: Type[Model],
     dataset_class: Type[Dataset],
     wandb_info: dict = None,
-) -> tuple[pl.Trainer, Model, LoggingCallback, pl.callbacks.ModelCheckpoint]:
+) -> tuple[pl.Trainer, Model, LoggingCallback, ModelCheckpoint]:
     output_dir = hparams.output_dir
     if os.path.exists(output_dir):
         if hparams.delete_existing_output:
@@ -211,7 +212,7 @@ def wrapped_train(
                 logger.warning(f"Unexpected keys in state dict: {keys.unexpected_keys}")
 
     logging_callback = LoggingCallback()
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+    checkpoint_callback = ModelCheckpoint(
         dirpath=output_dir,
         filename=f"{{epoch}}_{{{model.dataset.metric_split_to_watch}:.4f}}",
         monitor=model.dataset.metric_split_to_watch,
@@ -234,7 +235,7 @@ def wrapped_train(
         precision=16 if hparams.fp16 else 32,
         logger=trainer_loggers,
         callbacks=[logging_callback, checkpoint_callback],
-        replace_sampler_ddp=False,
+        use_distributed_sampler=False,
         deterministic="warn" if hparams.debug else None,
         detect_anomaly=hparams.debug,
     )
@@ -261,7 +262,7 @@ def train(
     dataset_class: Type[Dataset],
     args: list = None,
     wandb_info: dict = None,
-) -> tuple[pl.Trainer, Model, LoggingCallback, pl.callbacks.ModelCheckpoint]:
+) -> tuple[pl.Trainer, Model, LoggingCallback, ModelCheckpoint]:
     argv = list(sys.argv)  # idk how argparser uses sys.argv, so making a backup to be safe
 
     parser = ArgumentParser()

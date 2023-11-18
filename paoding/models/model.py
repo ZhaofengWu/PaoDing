@@ -3,8 +3,7 @@ from collections import defaultdict
 from typing import Any
 
 from lightning_utilities.core.apply_func import apply_to_collection
-import numpy as np
-import pytorch_lightning as pl
+import lightning as pl
 import torch
 import torch.nn.functional as F
 from torch.optim import Optimizer
@@ -32,6 +31,7 @@ class Model(pl.LightningModule):
         self._data_is_prepared = False
         self.prepare_data()
         self.metrics = self.setup_metrics()
+        self._eval_outputs = {}
 
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
@@ -139,9 +139,7 @@ class Model(pl.LightningModule):
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
 
-    def optimizer_zero_grad(
-        self, epoch: int, batch_idx: int, optimizer: Optimizer, optimizer_idx: int
-    ):
+    def optimizer_zero_grad(self, epoch: int, batch_idx: int, optimizer: Optimizer):
         """See https://pytorch.org/docs/stable/generated/torch.optim.Optimizer.zero_grad.html"""
         optimizer.zero_grad(set_to_none=True)
 
@@ -275,16 +273,22 @@ class Model(pl.LightningModule):
         if getattr(self, "analysis_enabled", False):
             return_dict["preds"] = preds.detach().cpu().numpy()
             return_dict["labels"] = labels.detach().cpu().numpy()
+
+        if split not in self._eval_outputs:
+            self._eval_outputs[split] = []
+        self._eval_outputs[split].append(return_dict)
+
         return return_dict
 
-    def eval_epoch_end(self, splits: list[str], outputs: list[list[dict[str, Any]]]):
+    def on_eval_epoch_end(self, splits: list[str]):
         num_splits = len(splits)
         # We gather individual metrics from each dataloader and compute the average if there is
         # more than one
         if num_splits > 1:
             sums = defaultdict(int)
 
-        for split, split_outputs in zip(splits, outputs, strict=True):
+        for split in splits:
+            split_outputs = self._eval_outputs[split]
             metrics = self.get_metrics(split, reset=True)
 
             if "loss" in split_outputs[0]:
@@ -298,6 +302,7 @@ class Model(pl.LightningModule):
                     sums[k] += v
                 else:
                     self.log(k, v)
+            self._eval_outputs[split].clear()
 
         agg_metrics = self.get_metrics("aggregate", reset=True)
         if num_splits > 1:
@@ -320,12 +325,8 @@ class Model(pl.LightningModule):
     ) -> dict[str, Any]:
         return self.eval_step(batch, batch_idx, self.dataset.dev_splits[dataloader_idx])
 
-    def validation_epoch_end(self, outputs: list[list[dict[str, Any]]] | list[dict[str, Any]]):
-        # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
-        # so we need a check here.
-        self.eval_epoch_end(
-            self.dataset.dev_splits, [outputs] if isinstance(outputs[0], dict) else outputs
-        )
+    def on_validation_epoch_end(self):
+        self.on_eval_epoch_end(self.dataset.dev_splits)
 
     def test_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int, dataloader_idx=0
@@ -333,12 +334,8 @@ class Model(pl.LightningModule):
         # self.eval_test_split is set in evaluate.py
         return self.eval_step(batch, batch_idx, self.eval_test_splits[dataloader_idx])
 
-    def test_epoch_end(self, outputs: list[dict[str, Any]]):
-        # pytorch-lightning "conveniently" unwraps the list when there's only one dataloader,
-        # so we need a check here.
-        self.eval_epoch_end(
-            self.eval_test_splits, [outputs] if isinstance(outputs[0], dict) else outputs
-        )
+    def on_test_epoch_end(self):
+        self.on_eval_epoch_end(self.eval_test_splits)
 
     @staticmethod
     def add_args(parser: ArgumentParser):

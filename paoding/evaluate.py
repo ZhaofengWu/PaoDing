@@ -11,9 +11,9 @@ os.environ.pop("SLURM_NTASKS", None)
 os.environ.pop("SLURM_JOB_NAME", None)
 
 import numpy as np
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import Callback
-from pytorch_lightning.utilities.types import STEP_OUTPUT
+import lightning as pl
+from lightning.pytorch.callbacks import Callback
+from lightning.pytorch.utilities.types import STEP_OUTPUT
 
 reload(logging)
 
