@@ -150,7 +150,9 @@ def wrapped_train(
             content = os.listdir(output_dir)
             whitelist_files = {"log.txt", "lightning_logs", "hparams.json"}
             if len(content) > 0 and any(c not in whitelist_files for c in content):
-                raise ValueError(f"Output directory ({output_dir}) already exists and is not empty.")
+                raise ValueError(
+                    f"Output directory ({output_dir}) already exists and is not empty."
+                )
             for c in content:
                 # TODO: check if this works for DDP -- log.txt is created by the master process and
                 # may be assumed to exist by the launched processes?

@@ -55,10 +55,6 @@ class Model(pl.LightningModule):
         kwargs = {}
         if self.dataset.task == "classification":
             kwargs["num_classes"] = self.dataset.num_labels
-        if self.dataset.task == "causal_lm":
-            # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
-            assert self.tokenizer.pad_token_id is not None
-            kwargs["ignore_index"] = self.tokenizer.pad_token_id
         return kwargs
 
     def setup_metrics(self) -> dict[str, dict[str, Metric]]:

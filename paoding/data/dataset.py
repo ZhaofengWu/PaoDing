@@ -103,6 +103,7 @@ class Dataset:
             self.hparams.max_length,
             self.tokenize_separately,
             self.task,
+            self.resplit_source_split,
         ]
 
     @property
@@ -331,7 +332,7 @@ class Dataset:
                 sampler = LengthGroupedSampler(batch_size, lengths=lens)
             else:
                 sampler = DistributedLengthGroupedSampler(batch_size, lengths=lens)
-            shuffle = False  # can't specify both shuffle and smapler
+            shuffle = False  # can't specify both shuffle and sampler
 
         batch_info = self.batch_info(split)
         dataloader = DataLoader(
@@ -377,11 +378,11 @@ class Dataset:
             batch_info = new_batch_info
 
         label_dtype = torch.float if self.task in {"regression", "multi_regression"} else torch.long
-        # TODO: this won't work for gpt2 now. See https://github.com/Lightning-AI/metrics/issues/54
-        # We could default to using 0 like above, but `torchmetrics` doesn't support masks yet,
-        # which makes it dangerous.
-        assert self.tokenizer.pad_token_id is not None
-        label_pad = self.tokenizer.pad_token_id if self.task in {"causal_lm", "masked_lm"} else None
+        label_pad = None
+        if self.task in {"causal_lm", "masked_lm"}:
+            label_pad = (
+                self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
+            )
         batch_info.update({self.label_key: (label_dtype, label_pad)})
         if self.task in {"causal_lm", "masked_lm"}:
             if self.tokenize_separately:
