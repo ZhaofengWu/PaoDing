@@ -227,7 +227,7 @@ class Dataset:
         return dict(padding=False, truncation=True, max_length=self.hparams.max_length)
 
     def tokenize(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
-        def tokenize_ex(examples: dict[str, list], split: str) -> dict[str, list]:
+        def tokenize_ex(examples: dict[str, list]) -> dict[str, list]:
             if self.tokenize_separately:
                 output = {}
                 for i, text in enumerate((examples[self.text_key], examples[self.second_text_key])):
@@ -246,7 +246,7 @@ class Dataset:
         return DatasetDict(  # reimplementing DatasetDict.map to provide `split`
             {
                 split: dataset.map(
-                    lambda examples: tokenize_ex(examples, split),
+                    tokenize_ex,
                     batched=True,
                     num_proc=4,
                     **(map_kwargs if map_kwargs is not None else {}),
