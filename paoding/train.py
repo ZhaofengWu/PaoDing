@@ -120,6 +120,8 @@ def add_generic_args(parser: ArgumentParser):
     parser.add_argument(
         "--ckpt_path", default=None, type=str, help="If specified, load the weights from this ckpt."
     )
+    parser.add_argument("--ckpt_save_top_k", default=1, type=int)
+    parser.add_argument("--ckpt_every_n_train_steps", default=None, type=int)
     parser.add_argument("--non_strict_load", action="store_true")
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--gpus", type=int, default=None)
@@ -217,8 +219,9 @@ def wrapped_train(
         filename=f"{{epoch}}_{{{model.dataset.metric_split_to_watch}:.4f}}",
         monitor=model.dataset.metric_split_to_watch,
         mode="max" if metric_higher_is_better(model.dataset.metric_to_watch) else "min",
-        save_top_k=1,
+        save_top_k=hparams.ckpt_save_top_k,
         save_last=True,
+        every_n_train_steps=hparams.ckpt_every_n_train_steps,
     )
 
     trainer_loggers = [TensorBoardLogger(hparams.output_dir, version=0)]

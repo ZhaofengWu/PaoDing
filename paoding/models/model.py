@@ -10,11 +10,16 @@ from torch.optim import Optimizer
 from torch.utils.data.dataloader import DataLoader
 import torchmetrics
 from torchmetrics import Metric
-from transformers import get_linear_schedule_with_warmup
+from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 from transformers import PreTrainedTokenizerBase
 
 from paoding.argument_parser import ArgumentParser
 from paoding.data.tokenizer import Tokenizer
+
+SCHEDULER_MAP = {
+    "cosine": get_cosine_schedule_with_warmup,
+    "linear": get_linear_schedule_with_warmup,
+}
 
 
 class Model(pl.LightningModule):
@@ -109,6 +114,7 @@ class Model(pl.LightningModule):
         optimizer = torch.optim.AdamW(
             optimizer_grouped_parameters,
             lr=self.hparams.lr,
+            betas=(self.hparams.adam_beta1, self.hparams.adam_beta2),
             eps=self.hparams.adam_epsilon,
         )
         scheduler = self.get_lr_scheduler(optimizer)
@@ -134,7 +140,7 @@ class Model(pl.LightningModule):
             if self.hparams.warmup_ratio > 0
             else self.hparams.warmup_steps
         )
-        scheduler = get_linear_schedule_with_warmup(
+        scheduler = SCHEDULER_MAP[self.hparams.scheduler_type](
             optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
@@ -343,7 +349,12 @@ class Model(pl.LightningModule):
         parser.add_argument("--weight_decay", default=0.0, type=float)
         parser.add_argument("--clip_norm", default=0.0, type=float)
         parser.add_argument("--accumulate_grad_batches", default=1, type=int)
+        parser.add_argument("--adam_beta1", default=0.9, type=float)
+        parser.add_argument("--adam_beta2", default=0.999, type=float)
         parser.add_argument("--adam_epsilon", default=1e-8, type=float)
+        parser.add_argument(
+            "--scheduler_type", default="linear", choices=SCHEDULER_MAP.keys(), type=str
+        )
         parser.add_argument("--warmup_steps", default=0, type=int)
         parser.add_argument("--warmup_ratio", default=0.0, type=float)
         parser.add_argument("--lr_scheduler_total_steps", default=None, type=int)
