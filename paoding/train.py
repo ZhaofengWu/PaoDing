@@ -237,7 +237,7 @@ def wrapped_train(
         devices=hparams.gpus if hparams.gpus > 0 else None,
         accumulate_grad_batches=hparams.accumulate_grad_batches,
         max_epochs=hparams.epochs,
-        precision=16 if hparams.fp16 else 32,
+        precision="16-mixed" if hparams.fp16 else 32,
         logger=trainer_loggers,
         callbacks=[logging_callback, checkpoint_callback],
         use_distributed_sampler=False,

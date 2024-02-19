@@ -1,9 +1,10 @@
 import argparse
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional
 
 from lightning_utilities.core.apply_func import apply_to_collection
 import lightning as pl
+from lightning.pytorch.utilities.types import LRSchedulerTypeUnion
 import torch
 import torch.nn.functional as F
 from torch.optim import Optimizer
@@ -15,6 +16,8 @@ from transformers import PreTrainedTokenizerBase
 
 from paoding.argument_parser import ArgumentParser
 from paoding.data.tokenizer import Tokenizer
+
+torch.set_float32_matmul_precision("high")
 
 SCHEDULER_MAP = {
     "cosine": get_cosine_schedule_with_warmup,
@@ -37,6 +40,7 @@ class Model(pl.LightningModule):
         self.prepare_data()
         self.metrics = self.setup_metrics()
         self._eval_outputs = {}
+        self.scheduler_step_counter = 0
 
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
         raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
@@ -140,6 +144,15 @@ class Model(pl.LightningModule):
             optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
         )
         return {"scheduler": scheduler, "interval": "step", "frequency": 1}
+
+    def lr_scheduler_step(self, scheduler: LRSchedulerTypeUnion, metric: Optional[Any]):
+        # From https://github.com/Lightning-AI/lightning/issues/5558#issuecomment-1774469254
+        assert hasattr(scheduler.optimizer, "_step_count")
+
+        if self.scheduler_step_counter < scheduler.optimizer._step_count:
+            super().lr_scheduler_step(scheduler, metric)
+            self.scheduler_step_counter += 1
+            assert self.scheduler_step_counter == scheduler.optimizer._step_count
 
     def optimizer_zero_grad(self, epoch: int, batch_idx: int, optimizer: Optimizer):
         """See https://pytorch.org/docs/stable/generated/torch.optim.Optimizer.zero_grad.html"""
