@@ -20,6 +20,8 @@ from lightning.fabric.utilities.cloud_io import _load as pl_load
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.strategies import DDPStrategy
+from torch.distributed.algorithms.ddp_comm_hooks import default_hooks
 import torchmetrics
 import wandb
 
@@ -125,6 +127,7 @@ def add_generic_args(parser: ArgumentParser):
     parser.add_argument("--non_strict_load", action="store_true")
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--gpus", type=int, default=None)
+    parser.add_argument("--ddp_static_graph", action="store_true")
     parser.add_argument("--seed", type=int, default=101)
     parser.add_argument("--no_wandb", action="store_true")  # for debugging
     parser.add_argument(
@@ -135,13 +138,8 @@ def add_generic_args(parser: ArgumentParser):
     )
 
 
-def wrapped_train(
-    hparams: argparse.Namespace,
-    argv: list[str],
-    model_class: Type[Model],
-    dataset_class: Type[Dataset],
-    wandb_info: dict = None,
-) -> tuple[pl.Trainer, Model, LoggingCallback, ModelCheckpoint]:
+@rank_zero_only
+def prepare_output_dir(hparams: argparse.Namespace):
     output_dir = hparams.output_dir
     if os.path.exists(output_dir):
         if hparams.delete_existing_output:
@@ -168,19 +166,34 @@ def wrapped_train(
     else:
         os.mkdir(output_dir)
 
+
+def wrapped_train(
+    hparams: argparse.Namespace,
+    argv: list[str],
+    model_class: Type[Model],
+    dataset_class: Type[Dataset],
+    wandb_info: dict = None,
+) -> tuple[pl.Trainer, Model, LoggingCallback, ModelCheckpoint]:
+    # Set by pytorch-lightning
+    local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
+
+    prepare_output_dir(hparams)
+    output_dir = hparams.output_dir
+
     assert (
         getattr(hparams, "model_class", None) is None
         and getattr(hparams, "dataset_class", None) is None
     )
     hparams.model_class = model_class
     hparams.dataset_class = dataset_class
-    json.dump(
-        {
-            k: str(v) if k in ("model_class", "dataset_class") else v
-            for k, v in vars(hparams).items()
-        },
-        open(os.path.join(output_dir, "hparams.json"), "w"),
-    )
+    if local_rank <= 0:
+        json.dump(
+            {
+                k: str(v) if k in ("model_class", "dataset_class") else v
+                for k, v in vars(hparams).items()
+            },
+            open(os.path.join(output_dir, "hparams.json"), "w"),
+        )
 
     if hparams.gpus is None:
         hparams.gpus = (
@@ -190,9 +203,6 @@ def wrapped_train(
         )
 
     pl.seed_everything(hparams.seed)
-
-    # Set by pytorch-lightning
-    local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
 
     logging.basicConfig(
         level=logging.INFO if local_rank <= 0 else logging.WARNING,
@@ -230,10 +240,19 @@ def wrapped_train(
     if not hparams.debug and not hparams.no_wandb and wandb_info is not None:
         output_dir_basename = os.path.basename(os.path.normpath(hparams.output_dir))
         trainer_loggers.append(WandbLogger(name=output_dir_basename, **wandb_info))
+    strategy = {}
+    if hparams.gpus > 1:
+        hooks = {}
+        if hparams.fp16:
+            hooks["ddp_comm_hook"] = default_hooks.fp16_compress_hook
+        strategy["strategy"] = DDPStrategy(
+            gradient_as_bucket_view=True, static_graph=hparams.ddp_static_graph, **hooks
+        )
     trainer = pl.Trainer(
         default_root_dir=hparams.output_dir,
         gradient_clip_val=hparams.clip_norm,
         accelerator="gpu" if hparams.gpus > 0 else None,
+        **strategy,
         devices=hparams.gpus if hparams.gpus > 0 else None,
         accumulate_grad_batches=hparams.accumulate_grad_batches,
         max_epochs=hparams.epochs,

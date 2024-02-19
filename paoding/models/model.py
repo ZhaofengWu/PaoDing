@@ -218,9 +218,12 @@ class Model(pl.LightningModule):
                 batch[self.dataset.label_key],
                 batch.get(self.dataset.label_mask_key),
             )
-        self.log("train_loss", loss, on_step=False, on_epoch=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         self.log(
-            "lr", self.trainer.lr_scheduler_configs[0].scheduler.get_last_lr()[-1], prog_bar=True
+            "lr",
+            self.trainer.lr_scheduler_configs[0].scheduler.get_last_lr()[-1],
+            prog_bar=True,
+            rank_zero_only=True,
         )
         return {"loss": loss}
 
@@ -313,10 +316,10 @@ class Model(pl.LightningModule):
             for k, v in metrics.items():
                 if num_splits > 1:
                     assert f"{k}_{split}" not in metrics
-                    self.log(f"{k}_{split}", v)
+                    self.log(f"{k}_{split}", v, sync_dist=True)
                     sums[k] += v
                 else:
-                    self.log(k, v)
+                    self.log(k, v, sync_dist=True)
             self._eval_outputs[split].clear()
 
         agg_metrics = self.get_metrics("aggregate", reset=True)
@@ -324,9 +327,9 @@ class Model(pl.LightningModule):
             for k, v in sums.items():
                 # It's important to keep the aggregate metric to be the original name, since it is
                 # the sort key.
-                self.log(k, v / num_splits)
+                self.log(k, v / num_splits, sync_dist=True)
             for k, v in agg_metrics.items():
-                self.log(k + "_microaggregate", v)
+                self.log(k + "_microaggregate", v, sync_dist=True)
 
     def get_metrics(self, split: str, reset=False) -> dict[str, Any]:
         metrics = {name: metric.compute() for name, metric in self.metrics[split].items()}
