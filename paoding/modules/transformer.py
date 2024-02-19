@@ -42,11 +42,15 @@ class Transformer(torch.nn.Module):
         config_args = dict(config_kwargs)
         if task == "base":  # TODO: this might break models that don't support this flag
             config_args["add_pooling_layer"] = False
-        self.config = AutoConfig.from_pretrained(hparams.transformer_model, **config_args)
+        self.config = AutoConfig.from_pretrained(
+            hparams.transformer_model, revision=hparams.revision, **config_args
+        )
         if hparams.random_init_transformer:
             self.model = _get_model_class(self.config, TASKS[task]._model_mapping)(self.config)
         else:
-            self.model = TASKS[task].from_pretrained(hparams.transformer_model, config=self.config)
+            self.model = TASKS[task].from_pretrained(
+                hparams.transformer_model, revision=hparams.revision, config=self.config
+            )
 
         if not trainable:
             for param in self.model.base_model.parameters():
@@ -72,6 +76,7 @@ class Transformer(torch.nn.Module):
             help="Model identifier from huggingface.co/models. Technically this could also be a"
             " local path, but untested, esp. the behavior when --random_init_transformer.",
         )
+        parser.add_argument("--revision", default=None, type=str)
         parser.add_argument("--random_init_transformer", action="store_true")
 
         return parser
