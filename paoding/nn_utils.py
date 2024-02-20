@@ -20,6 +20,16 @@ def lens_to_mask(lens: torch.Tensor, max_len: int = None):
     return torch.arange(max_len, device=lens.device).expand(len(lens), -1) < lens.unsqueeze(1)
 
 
+def flip_last_true(tensor: torch.BoolTensor):
+    # tensor: (bsz, seq_len)
+    bsz, seq_len = tensor.shape
+    assert tensor.any(-1).all()
+    last_true_indices = seq_len - torch.argmax(tensor.byte().flip(1), dim=1) - 1
+    mask = torch.zeros_like(tensor)
+    mask[torch.arange(bsz), last_true_indices] = True
+    return tensor & ~mask
+
+
 def padded_nonzero(tensor: torch.Tensor):
     """
     padded_nonzero(
