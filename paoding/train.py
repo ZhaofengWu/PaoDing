@@ -255,7 +255,7 @@ def wrapped_train(
     trainer = pl.Trainer(
         default_root_dir=hparams.output_dir,
         gradient_clip_val=hparams.clip_norm,
-        accelerator="gpu" if hparams.gpus > 0 else None,
+        accelerator="gpu" if hparams.gpus > 0 else "cpu",
         **strategy,
         devices=hparams.gpus if hparams.gpus > 0 else None,
         accumulate_grad_batches=hparams.accumulate_grad_batches,
