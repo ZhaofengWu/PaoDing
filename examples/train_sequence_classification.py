@@ -16,6 +16,6 @@ if __name__ == "__main__":
         label_key="label",
         task="classification",
         num_labels=3,
-        metric_names=["Accuracy"],
+        metric_names=["MulticlassAccuracy"],
     )
     train(model_cls, dataset_cls)

@@ -88,7 +88,11 @@ class LoggingCallback(pl.Callback):
 def metric_higher_is_better(metric_name: str) -> bool:
     if metric_name == "loss":
         return False
-    higher_is_better = getattr(torchmetrics, metric_name).higher_is_better
+    try:
+        metric_cls = getattr(torchmetrics, metric_name)
+    except AttributeError:
+        metric_cls = getattr(torchmetrics.classification, metric_name)
+    higher_is_better = metric_cls.higher_is_better
     assert higher_is_better is not None
     return higher_is_better
 

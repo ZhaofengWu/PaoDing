@@ -54,11 +54,12 @@ class Model(pl.LightningModule):
             self.tokenizer.prepare(self.dataset)
         self._data_is_prepared = True
 
-    @property
-    def metric_init_kwargs(self) -> dict[str, Any]:
+    def metric_init_kwargs(self, metric_name: str) -> dict[str, Any]:
         kwargs = {}
         if self.dataset.task == "classification":
             kwargs["num_classes"] = self.dataset.num_labels
+        if metric_name == "MulticlassAccuracy":
+            kwargs["average"] = "micro"
         return kwargs
 
     def setup_metrics(self) -> dict[str, dict[str, Metric]]:
@@ -68,13 +69,16 @@ class Model(pl.LightningModule):
             + self.dataset.test_splits
             + ["aggregate"]
         )
-        return {
-            split: {
-                name: getattr(torchmetrics, name)(**self.metric_init_kwargs)
-                for name in self.dataset.metric_names
-            }
-            for split in metric_splits
-        }
+        metrics = {}
+        for split in metric_splits:
+            metrics[split] = {}
+            for name in self.dataset.metric_names:
+                try:
+                    metric_cls = getattr(torchmetrics, name)
+                except AttributeError:
+                    metric_cls = getattr(torchmetrics.classification, name)
+                metrics[split][name] = metric_cls(**self.metric_init_kwargs(name))
+        return metrics
 
     def train_dataloader(self) -> DataLoader:
         return self.dataset.dataloader(

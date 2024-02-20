@@ -32,7 +32,7 @@ setup(
         "tensorboardX==2.6.2.2",
         "tokenizers==0.15.0",
         "torch==1.13.1",
-        "torchmetrics==0.10.0",
+        "torchmetrics==1.3.1",
         "tqdm==4.66.1",
         "transformers==4.35.2",
         "wandb==0.16.0",
