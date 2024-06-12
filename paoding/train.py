@@ -257,7 +257,7 @@ def wrapped_train(
         gradient_clip_val=hparams.clip_norm,
         accelerator="gpu" if hparams.gpus > 0 else "cpu",
         **strategy,
-        devices=hparams.gpus if hparams.gpus > 0 else None,
+        devices=hparams.gpus if hparams.gpus > 0 else 1,
         accumulate_grad_batches=hparams.accumulate_grad_batches,
         max_epochs=hparams.epochs,
         precision="16-mixed" if hparams.fp16 else 32,
