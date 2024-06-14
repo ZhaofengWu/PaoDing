@@ -4,6 +4,8 @@ Some functions are copied from [AllenNLP](https://github.com/allenai/allennlp/bl
 
 import torch
 
+from paoding.data.collator import PAD_TYPE
+
 
 def merge_first_dims(tensor: torch.Tensor, n=2):
     return tensor.reshape(-1, *tensor.shape[n:])
@@ -69,6 +71,54 @@ def padded_nonzero(tensor: torch.Tensor):
     nonzero_indices = per_batch_indices.new_full((bsz, max_per_batch), -1)
     nonzero_indices[batch_indices, batch_arange] = per_batch_indices
     return nonzero_indices
+
+
+def select_after_indices(
+    tensor: torch.Tensor, mask: torch.Tensor, indices: torch.Tensor, dim: int, pad_value: PAD_TYPE
+) -> torch.Tensor:
+    """
+    Select the values after the indices in each row of the tensor. Shift everything to the left and
+    right-pad with pad_value. `tensor` and `indices` should have identical shapes except `indices`
+    doesn't have the `dim` dimension.
+
+    Args:
+        tensor: (*before, seq_len, *after)
+        mask: (*before, seq_len, *after)
+        indices: (*before, *after)
+
+    Output:
+        (*before, shorter_seq_len, *after)
+    """
+    # permute/reshape into (bsz, seq_len) for easier processing
+    dims_before = tensor.shape[:dim]
+    dims_after = tensor.shape[dim + 1 :]
+    tensor = tensor.permute(*range(dim), *range(dim + 1, tensor.dim()), dim)
+    mask = mask.permute(*range(dim), *range(dim + 1, mask.dim()), dim)
+    assert tensor.shape[:-1] == mask.shape[:-1] == indices.shape
+    tensor = tensor.reshape(-1, tensor.shape[-1])
+    mask = mask.reshape(-1, mask.shape[-1])
+    indices = indices.reshape(-1)
+
+    bsz, seq_len = tensor.shape
+
+    # Compute the mask for valid positions
+    range_tensor = torch.arange(seq_len, device=tensor.device).unsqueeze(0)  # (1, seq_len)
+    valid_mask = (range_tensor >= indices.unsqueeze(-1)) & mask  # (bsz, seq_len)
+
+    # Initialize the output tensor
+    max_segment_length = valid_mask.sum(dim=1).max().item()
+    output_tensor = torch.full(
+        (bsz, max_segment_length), pad_value, dtype=tensor.dtype, device=tensor.device
+    )
+
+    # Fill the output tensor with valid segments
+    valid_indices = valid_mask.nonzero(as_tuple=True)
+    relative_indices = valid_indices[1] - indices[valid_indices[0]]
+    output_tensor[valid_indices[0], relative_indices] = tensor[valid_indices]
+
+    # reshape/permute back
+    output_tensor = output_tensor.reshape(*dims_before, *dims_after, max_segment_length)
+    return output_tensor.permute(*range(dim), -1, *range(dim, output_tensor.dim() - 1))
 
 
 def info_value_of_dtype(dtype: torch.dtype):
