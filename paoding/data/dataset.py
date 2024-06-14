@@ -227,28 +227,64 @@ class Dataset:
     def tokenize_kwargs(self) -> dict[str, Any]:
         return dict(padding=False, truncation=True, max_length=self.hparams.max_length)
 
-    def tokenize(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
-        def tokenize_ex(examples: dict[str, list]) -> dict[str, list]:
-            if self.tokenize_separately:
-                output = {}
-                for i, text in enumerate((examples[self.text_key], examples[self.second_text_key])):
-                    single_output = self.tokenizer(text, **self.tokenize_kwargs)
-                    output.update({f"{k}_{i + 1}": v for k, v in single_output.items()})
-                return output
-            else:
-                return self.tokenizer(
-                    examples[self.text_key],
-                    text_pair=examples[self.second_text_key]
-                    if self.second_text_key is not None
-                    else None,
-                    **self.tokenize_kwargs,
-                )
+    def tokenize_ex(self, examples: dict[str, list]) -> dict[str, list]:
+        if self.tokenize_separately:
+            output = {}
+            for i, text in enumerate((examples[self.text_key], examples[self.second_text_key])):
+                single_output = self.tokenizer(text, **self.tokenize_kwargs)
+                output.update({f"{k}_{i + 1}": v for k, v in single_output.items()})
+            return output
+        else:
+            return self.tokenizer(
+                examples[self.text_key],
+                text_pair=(
+                    examples[self.second_text_key] if self.second_text_key is not None else None
+                ),
+                **self.tokenize_kwargs,
+            )
 
+    def tokenize_seq2seq(self, example: dict[str, Any]) -> dict[str, Any]:
+        # Reference: https://github.com/huggingface/trl/blob/79686e1ac701b1f5e3709a65efa8f13363bcde06/trl/trainer/dpo_trainer.py#L678-L726
+        assert not self.tokenize_separately
+
+        prompt = example[self.text_key]
+        answer = example[self.label_key]
+
+        full_tokenized = self.tokenizer(prompt + answer, add_special_tokens=False)
+        full_input_ids = full_tokenized["input_ids"]
+        prompt_input_ids = self.tokenizer(prompt, add_special_tokens=False)["input_ids"]
+
+        # On some tokenizers, like Llama-2 tokenizer, there are occasions where tokens
+        # can be merged together when tokenizing prompt+answer. This could result
+        # in the last token from the prompt being different when tokenized on its own
+        # vs when done as prompt+answer.
+        # prompt: a b c d
+        # full  : a b c d' e f g
+        common_prompt_len = len(prompt_input_ids)
+        if prompt_input_ids != full_input_ids[:common_prompt_len]:
+            common_prompt_len -= 1
+        assert prompt_input_ids[:common_prompt_len] == full_input_ids[:common_prompt_len]
+
+        assert self.tokenizer.eos_token_id is not None
+        full_input_ids = full_input_ids + [self.tokenizer.eos_token_id]
+        attention_mask = full_tokenized["attention_mask"] + [1]
+        if self.tokenizer.bos_token_id is not None:
+            full_input_ids = [self.tokenizer.bos_token_id] + full_input_ids
+            attention_mask = [1] + attention_mask
+            common_prompt_len += 1
+
+        return {
+            "input_ids": full_input_ids,
+            "attention_mask": attention_mask,
+            "prompt_len": common_prompt_len,
+        }
+
+    def tokenize(self, dataset_dict: DatasetDict, map_kwargs: dict = None) -> DatasetDict:
         return DatasetDict(  # reimplementing DatasetDict.map to provide `split`
             {
                 split: dataset.map(
-                    tokenize_ex,
-                    batched=True,
+                    self.tokenize_ex if self.task != "seq2seq" else self.tokenize_seq2seq,
+                    batched=self.task != "seq2seq",  # the logic is too complicated for batching
                     num_proc=4,
                     **(map_kwargs if map_kwargs is not None else {}),
                 )
@@ -256,31 +292,43 @@ class Dataset:
             }
         )
 
-    def prepare_input_for_lm(self, dataset_dict):
-        def remap_ex_causal_lm(examples, suffix=""):
-            return {
-                f"input_ids{suffix}": examples[f"input_ids{suffix}"][:-1],
-                f"attention_mask{suffix}": examples[f"attention_mask{suffix}"][:-1],
-                f"{self.label_key}{suffix}": examples[f"input_ids{suffix}"][1:],
-                f"{self.label_mask_key}{suffix}": examples[f"attention_mask{suffix}"][1:],
-            }
+    def remap_ex_causal_lm(self, example: dict[str, Any], suffix="") -> dict[str, Any]:
+        return {
+            f"input_ids{suffix}": example[f"input_ids{suffix}"][:-1],
+            f"attention_mask{suffix}": example[f"attention_mask{suffix}"][:-1],
+            f"{self.label_key}{suffix}": example[f"input_ids{suffix}"][1:],
+            f"{self.label_mask_key}{suffix}": example[f"attention_mask{suffix}"][1:],
+        }
 
-        def remap_ex_masked_lm(examples, suffix=""):
-            return {
-                f"{self.label_key}{suffix}": examples[f"input_ids{suffix}"],
-                f"{self.label_mask_key}{suffix}": examples[f"attention_mask{suffix}"],
-            }
+    def remap_ex_seq2seq(self, example: dict[str, Any], suffix="") -> dict[str, Any]:
+        prompt_len = example["prompt_len"]
+        return {
+            f"input_ids{suffix}": example[f"input_ids{suffix}"][:-1],
+            f"attention_mask{suffix}": example[f"attention_mask{suffix}"][:-1],
+            f"{self.label_key}{suffix}": example[f"input_ids{suffix}"][prompt_len:],
+            f"{self.label_mask_key}{suffix}": example[f"attention_mask{suffix}"][prompt_len:],
+        }
 
+    def remap_ex_masked_lm(self, example: dict[str, Any], suffix="") -> dict[str, Any]:
+        return {
+            f"{self.label_key}{suffix}": example[f"input_ids{suffix}"],
+            f"{self.label_mask_key}{suffix}": example[f"attention_mask{suffix}"],
+        }
+
+    def prepare_input_for_lm(self, dataset_dict: DatasetDict) -> DatasetDict:
         remap_ex = {
-            "causal_lm": remap_ex_causal_lm,
-            "masked_lm": remap_ex_masked_lm,
+            "causal_lm": self.remap_ex_causal_lm,
+            "seq2seq": self.remap_ex_seq2seq,
+            "masked_lm": self.remap_ex_masked_lm,
         }[self.task]
         return DatasetDict(
             {
                 k: d.map(
-                    lambda examples: remap_ex(examples)
-                    if not self.tokenize_separately
-                    else {**remap_ex(examples, "_1"), **remap_ex(examples, "_2")},
+                    lambda example: (
+                        remap_ex(example)
+                        if not self.tokenize_separately
+                        else {**remap_ex(example, "_1"), **remap_ex(example, "_2")}
+                    ),
                     batched=False,
                     num_proc=4,
                 )
@@ -296,9 +344,7 @@ class Dataset:
             dataset_dict["dev"] = dataset_dict["validation"]
             del dataset_dict["validation"]
 
-        if self.task in {"causal_lm", "masked_lm"}:
-            # TODO: this is slightly inconsistent with the tokenization above, where only the lambda
-            # is separated into a different function. Make this consistent
+        if self.task in {"causal_lm", "seq2seq", "masked_lm"}:
             dataset_dict = self.prepare_input_for_lm(dataset_dict)
 
         return dataset_dict
@@ -379,12 +425,12 @@ class Dataset:
 
         label_dtype = torch.float if self.task in {"regression", "multi_regression"} else torch.long
         label_pad = None
-        if self.task in {"causal_lm", "masked_lm"}:
+        if self.task in {"causal_lm", "seq2seq", "masked_lm"}:
             label_pad = (
                 self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
             )
         batch_info.update({self.label_key: (label_dtype, label_pad)})
-        if self.task in {"causal_lm", "masked_lm"}:
+        if self.task in {"causal_lm", "seq2seq", "masked_lm"}:
             if self.tokenize_separately:
                 del batch_info[self.label_key]
                 batch_info.update(
@@ -397,6 +443,8 @@ class Dataset:
                 )
             else:
                 batch_info.update({self.label_mask_key: (torch.bool, False)})
+        if self.task == "seq2seq":
+            batch_info.update({"prompt_len": (torch.long, 0)})
         return batch_info
 
     def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:

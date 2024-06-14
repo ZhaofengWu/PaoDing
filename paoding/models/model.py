@@ -179,8 +179,8 @@ class Model(pl.LightningModule):
         self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
     ) -> torch.Tensor:
         match self.dataset.task:
-            case "classification" | "causal_lm" | "masked_lm":
-                if self.dataset.task == "causal_lm":
+            case "classification" | "causal_lm" | "seq2seq" | "masked_lm":
+                if self.dataset.task in {"causal_lm", "seq2seq"}:
                     assert mask is not None and mask.any(dim=-1).all()
                 if self.dataset.task == "masked_lm":
                     assert mask is not None
@@ -240,7 +240,7 @@ class Model(pl.LightningModule):
                 return logits.squeeze(dim=-1)
             case "multi_regression":
                 return logits
-            case "causal_lm":
+            case "causal_lm" | "seq2seq":
                 # Perplexity is a weird metric as it needs the raw distribution... So this is
                 # actually not a prediction, and we need to do something else for real decoding.
                 # But then, the problem there is more complicated anyway since there's beam search
