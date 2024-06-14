@@ -22,7 +22,6 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from torch.distributed.algorithms.ddp_comm_hooks import default_hooks
-import torchmetrics
 import wandb
 
 reload(logging)
@@ -34,6 +33,16 @@ from paoding.utils import get_logger
 
 
 logger = get_logger(__name__)
+
+
+def watch_metric_higher_is_better(model: Model) -> bool:
+    if model.dataset.metric_to_watch == "loss":
+        return False
+    higher_is_better = model.metrics[model.dataset.dev_splits[0]][
+        model.dataset.metric_to_watch
+    ].higher_is_better
+    assert higher_is_better is not None
+    return higher_is_better
 
 
 class LoggingCallback(pl.Callback):
@@ -59,7 +68,7 @@ class LoggingCallback(pl.Callback):
 
     def log_metrics(self, trainer: pl.Trainer, pl_module: Model):
         metrics = trainer.callback_metrics
-        higher_is_better = metric_higher_is_better(pl_module.dataset.metric_to_watch)
+        higher_is_better = watch_metric_higher_is_better(pl_module)
         # Log results
         for key in sorted(metrics):
             if key not in ["log", "progress_bar"]:
@@ -83,18 +92,6 @@ class LoggingCallback(pl.Callback):
             logger.info(f"best_epoch = {self.best_epoch}")
             for key, value in sorted(self.best_dev_metrics.items()):
                 logger.info(f"best_{key} = {value}")
-
-
-def metric_higher_is_better(metric_name: str) -> bool:
-    if metric_name == "loss":
-        return False
-    try:
-        metric_cls = getattr(torchmetrics, metric_name)
-    except AttributeError:
-        metric_cls = getattr(torchmetrics.classification, metric_name)
-    higher_is_better = metric_cls.higher_is_better
-    assert higher_is_better is not None
-    return higher_is_better
 
 
 def parse_meta_args(add_args_fn):
@@ -234,7 +231,7 @@ def wrapped_train(
         dirpath=output_dir,
         filename=f"{{epoch}}_{{{model.dataset.metric_split_to_watch}:.4f}}",
         monitor=model.dataset.metric_split_to_watch,
-        mode="max" if metric_higher_is_better(model.dataset.metric_to_watch) else "min",
+        mode="max" if watch_metric_higher_is_better(model) else "min",
         save_top_k=hparams.ckpt_save_top_k,
         save_last=True,
         every_n_train_steps=hparams.ckpt_every_n_train_steps,

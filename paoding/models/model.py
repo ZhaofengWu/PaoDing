@@ -62,6 +62,13 @@ class Model(pl.LightningModule):
             kwargs["average"] = "micro"
         return kwargs
 
+    def setup_metric(self, metric_name: str) -> Metric:
+        try:
+            metric_cls = getattr(torchmetrics, metric_name)
+        except AttributeError:
+            metric_cls = getattr(torchmetrics.classification, metric_name)
+        return metric_cls(**self.metric_init_kwargs(metric_name))
+
     def setup_metrics(self) -> dict[str, dict[str, Metric]]:
         metric_splits = (
             [self.dataset.train_split]
@@ -69,16 +76,10 @@ class Model(pl.LightningModule):
             + self.dataset.test_splits
             + ["aggregate"]
         )
-        metrics = {}
-        for split in metric_splits:
-            metrics[split] = {}
-            for name in self.dataset.metric_names:
-                try:
-                    metric_cls = getattr(torchmetrics, name)
-                except AttributeError:
-                    metric_cls = getattr(torchmetrics.classification, name)
-                metrics[split][name] = metric_cls(**self.metric_init_kwargs(name))
-        return metrics
+        return {
+            split: {name: self.setup_metric(name) for name in self.dataset.metric_names}
+            for split in metric_splits
+        }
 
     def train_dataloader(self) -> DataLoader:
         return self.dataset.dataloader(
