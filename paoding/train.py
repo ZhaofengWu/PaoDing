@@ -123,6 +123,7 @@ def add_generic_args(parser: ArgumentParser):
     parser.add_argument(
         "--ckpt_path", default=None, type=str, help="If specified, load the weights from this ckpt."
     )
+    parser.add_argument("--no_ckpt", action="store_true")
     parser.add_argument("--ckpt_save_top_k", default=1, type=int)
     parser.add_argument("--ckpt_every_n_train_steps", default=None, type=int)
     parser.add_argument("--non_strict_load", action="store_true")
@@ -259,7 +260,7 @@ def wrapped_train(
         max_epochs=hparams.epochs,
         precision="16-mixed" if hparams.fp16 else 32,
         logger=trainer_loggers,
-        callbacks=[logging_callback, checkpoint_callback],
+        callbacks=[logging_callback] + ([checkpoint_callback] if not hparams.no_ckpt else []),
         use_distributed_sampler=False,
         deterministic="warn" if hparams.debug else None,
         detect_anomaly=hparams.debug,
@@ -272,7 +273,7 @@ def wrapped_train(
             text=("Success: " if not trainer.interrupted else "Failure: ") + hparams.output_dir,
         )
 
-    if not trainer.interrupted and local_rank <= 0:
+    if not trainer.interrupted and local_rank <= 0 and not hparams.no_ckpt:
         best_model_path = Path(checkpoint_callback.best_model_path)
         symlink_path = best_model_path.parent / "best.ckpt"
         # Use relative path so that the symlink still works after directory rename
