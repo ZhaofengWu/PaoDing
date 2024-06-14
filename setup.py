@@ -22,6 +22,7 @@ setup(
     author_email="zfw7@cs.washington.edu",
     packages=["paoding"],
     install_requires=[
+        "accelerate==0.31.0",
         "datasets==2.19.2",
         "lightning==2.2.5",
         "lightning-utilities==0.11.2",
@@ -33,7 +34,7 @@ setup(
         "tokenizers==0.19.1",
         "torch==2.3.0",
         "torchmetrics==1.4.0.post0",
-        "tqdm==4.66.2",
+        "tqdm==4.66.4",
         "transformers==4.41.2",
         "wandb==0.17.1",
     ],
