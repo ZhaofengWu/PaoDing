@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 
 import torch
 from transformers import (
@@ -42,14 +43,18 @@ class Transformer(torch.nn.Module):
         config_args = dict(config_kwargs)
         if task == "base":  # TODO: this might break models that don't support this flag
             config_args["add_pooling_layer"] = False
+        token = os.environ.get("HF_TOKEN")
         self.config = AutoConfig.from_pretrained(
-            hparams.transformer_model, revision=hparams.revision, **config_args
+            hparams.transformer_model, revision=hparams.revision, token=token, **config_args
         )
         if hparams.random_init_transformer:
             self.model = _get_model_class(self.config, TASKS[task]._model_mapping)(self.config)
         else:
             self.model = TASKS[task].from_pretrained(
-                hparams.transformer_model, revision=hparams.revision, config=self.config
+                hparams.transformer_model,
+                revision=hparams.revision,
+                config=self.config,
+                token=token,
             )
 
         if not trainable:

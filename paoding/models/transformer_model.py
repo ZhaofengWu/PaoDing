@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import torch
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
@@ -18,7 +19,8 @@ class TransformerModel(Model):
         self.transformer = Transformer(self.hparams, task, trainable=trainable, **config_kwargs)
 
     def setup_tokenizer(self) -> PreTrainedTokenizerBase:
-        return AutoTokenizer.from_pretrained(self.hparams.transformer_model)
+        token = os.environ.get("HF_TOKEN")
+        return AutoTokenizer.from_pretrained(self.hparams.transformer_model, token=token)
 
     def forward(self, batch: dict[str, torch.Tensor]):
         return self.transformer(
