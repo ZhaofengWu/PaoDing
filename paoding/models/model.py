@@ -195,7 +195,7 @@ class Model(pl.LightningModule):
                     loss = loss.reshape_as(labels) * mask
                     if reduce:
                         loss = loss.sum() / mask.sum()
-            case "regression":
+            case "regression" | "multi_regression":
                 loss = F.mse_loss(
                     logits.reshape(-1),
                     labels.reshape(-1),
