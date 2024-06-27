@@ -176,7 +176,12 @@ class Model(pl.LightningModule):
         apply_to_collection(self.metrics, Metric, lambda metric: metric.to(self.device))
 
     def compute_loss(
-        self, logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor = None, reduce=True
+        self,
+        logits: torch.Tensor,
+        labels: torch.Tensor = None,
+        mask: torch.Tensor = None,
+        logits_rejected: torch.Tensor = None,
+        reduce=True,
     ) -> torch.Tensor:
         match self.dataset.task:
             case "classification" | "causal_lm" | "seq2seq" | "masked_lm":
@@ -209,6 +214,10 @@ class Model(pl.LightningModule):
                         loss = loss.sum() / mask.sum()
                         if self.dataset.task == "multi_regression":
                             loss /= logits.shape[-1]
+            case "pairwise_rm":  # TODO: support for pairwise RM has not been tested
+                loss = -F.logsigmoid(logits - logits_rejected)
+                if reduce:
+                    loss = loss.mean()
             case _:
                 raise KeyError(f"Output mode not supported: {self.dataset.task}")
         return loss
@@ -218,11 +227,16 @@ class Model(pl.LightningModule):
         if "loss" in output:
             loss = output["loss"]
         else:
-            loss = self.compute_loss(
-                output["logits"],
-                batch[self.dataset.label_key],
-                batch.get(self.dataset.label_mask_key),
-            )
+            if self.dataset.task == "pairwise_rm":
+                loss = self.compute_loss(
+                    output["logits_chosen"], logits_rejected=output["logits_rejected"]
+                )
+            else:
+                loss = self.compute_loss(
+                    output["logits"],
+                    batch[self.dataset.label_key],
+                    batch.get(self.dataset.label_mask_key),
+                )
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         self.log(
             "lr",

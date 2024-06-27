@@ -146,6 +146,17 @@ class Dataset:
         return None
 
     @property
+    def prompt_and_response_key(self) -> tuple[str, str]:
+        """For reward modeling, a tuple of the keys in the example dictionary for the prompt and
+        the response (pointwise) or the chosen response (pairwise)."""
+        return None
+
+    @property
+    def rejected_response_key(self) -> str:
+        """For pairwise reward modeling, the key in the example dictionary for the rejected response."""
+        return None
+
+    @property
     def label_key(self) -> str:
         return "label"
 
@@ -156,11 +167,11 @@ class Dataset:
 
     @property
     def sort_key(self) -> str | tuple[str, str]:
-        return (
-            "input_ids"
-            if self.second_text_key is None or not self.tokenize_separately
-            else ("input_ids_1", "input_ids_2")
-        )
+        if self.task == "pairwise_rm":
+            return ("input_ids_chosen", "input_ids_rejected")
+        elif self.second_text_key is not None and self.tokenize_separately:
+            return ("input_ids_1", "input_ids_2")
+        return "input_ids"
 
     @property
     def task(self) -> str:
@@ -170,6 +181,8 @@ class Dataset:
     def num_labels(self) -> int:
         if self.task == "regression":
             return 1
+        elif self.task == "pairwise_rm":
+            return None
         else:
             raise NotImplementedError("This is an abstract class. Do not instantiate it directly!")
 
@@ -228,6 +241,32 @@ class Dataset:
         return dict(padding=False, truncation=True, max_length=self.hparams.max_length)
 
     def tokenize_ex(self, examples: dict[str, list]) -> dict[str, list]:
+        if self.prompt_and_response_key is not None:
+            prompt_and_response_keys_and_suffixes = [[self.prompt_and_response_key, ""]]
+            if self.rejected_response_key is not None:
+                assert self.task == "pairwise_rm"
+                prompt_and_response_keys_and_suffixes[0][1] = "_chosen"
+                prompt_and_response_keys_and_suffixes.append(
+                    [self.rejected_response_key, "_rejected"]
+                )
+            output = {}
+            for (prompt_key, response_key), suffix in prompt_and_response_keys_and_suffixes:
+                prompt_key, response_key = self.prompt_and_response_key
+                messages = [
+                    [
+                        {"role": "user", "content": prompt},
+                        {"role": "assistant", "content": response},
+                    ]
+                    for prompt, response in zip(
+                        examples[prompt_key], examples[response_key], strict=True
+                    )
+                ]
+                single_output = self.tokenizer.apply_chat_template(
+                    messages, return_dict=True, **self.tokenize_kwargs
+                )
+                output.update({f"{k}{suffix}": v for k, v in single_output.items()})
+            return output
+
         if self.tokenize_separately:
             output = {}
             for i, text in enumerate((examples[self.text_key], examples[self.second_text_key])):
@@ -417,34 +456,45 @@ class Dataset:
         batch_info = {
             name: known_tokenizer_fields[name] for name in self.tokenizer.model_input_names
         }
+        if self.task == "pairwise_rm":
+            new_batch_info = {}
+            for response_desc in ("chosen", "rejected"):
+                new_batch_info.update({f"{k}_{response_desc}": v for k, v in batch_info.items()})
+            batch_info = new_batch_info
         if self.tokenize_separately:
             new_batch_info = {}
             for i in (1, 2):
                 new_batch_info.update({f"{k}_{i}": v for k, v in batch_info.items()})
             batch_info = new_batch_info
 
-        label_dtype = torch.float if self.task in {"regression", "multi_regression"} else torch.long
-        label_pad = None
-        if self.task in {"causal_lm", "seq2seq", "masked_lm"}:
-            label_pad = (
-                self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
+        # label
+        if self.task != "pairwise_rm":
+            label_dtype = (
+                torch.float if self.task in {"regression", "multi_regression"} else torch.long
             )
-        batch_info.update({self.label_key: (label_dtype, label_pad)})
-        if self.task in {"causal_lm", "seq2seq", "masked_lm"}:
-            if self.tokenize_separately:
-                del batch_info[self.label_key]
-                batch_info.update(
-                    {
-                        f"{self.label_key}_1": (label_dtype, label_pad),
-                        f"{self.label_key}_2": (label_dtype, label_pad),
-                        f"{self.label_mask_key}_1": (torch.bool, False),
-                        f"{self.label_mask_key}_2": (torch.bool, False),
-                    }
+            label_pad = None
+            if self.task in {"causal_lm", "seq2seq", "masked_lm"}:
+                label_pad = (
+                    self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
                 )
-            else:
-                batch_info.update({self.label_mask_key: (torch.bool, False)})
+            batch_info.update({self.label_key: (label_dtype, label_pad)})
+            if self.task in {"causal_lm", "seq2seq", "masked_lm"}:
+                if self.tokenize_separately:
+                    del batch_info[self.label_key]
+                    batch_info.update(
+                        {
+                            f"{self.label_key}_1": (label_dtype, label_pad),
+                            f"{self.label_key}_2": (label_dtype, label_pad),
+                            f"{self.label_mask_key}_1": (torch.bool, False),
+                            f"{self.label_mask_key}_2": (torch.bool, False),
+                        }
+                    )
+                else:
+                    batch_info.update({self.label_mask_key: (torch.bool, False)})
+
         if self.task == "seq2seq":
             batch_info.update({"prompt_len": (torch.long, 0)})
+
         return batch_info
 
     def before_collation(self, batch: list[dict[str, list]]) -> list[dict[str, list]]:
