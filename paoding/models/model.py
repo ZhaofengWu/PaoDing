@@ -283,10 +283,11 @@ class Model(pl.LightningModule):
             for metric in self.metrics[s].values():
                 if getattr(metric, "supports_mask", False):
                     # An opportunity for custom metrics that want to take un-flattened preds/labels
+                    label_mask = batch.get(self.dataset.label_mask_key)
                     metric(
                         preds.detach(),
                         labels.detach(),
-                        batch.get(self.dataset.label_mask_key).detach(),
+                        label_mask.detach() if label_mask is not None else None,
                     )
                 else:
                     # For other metrics, we merge the batch dim and the seq dim, but perplexity
