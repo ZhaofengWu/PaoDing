@@ -328,6 +328,7 @@ class Dataset:
                 for i, v in enumerate(dataset_split[k]):  # TODO: this is a bit slow
                     # LengthGroupedSampler sorts from longest to shortest; we want the reverse
                     lens[i] -= len(v)
+                    # lens[i] += len(v)
             if self.hparams.gpus <= 1:
                 sampler = LengthGroupedSampler(batch_size, lengths=lens)
             else:

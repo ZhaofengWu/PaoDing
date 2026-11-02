@@ -22,6 +22,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 from torch.distributed.algorithms.ddp_comm_hooks import default_hooks
+# import torch
 import torchmetrics
 import wandb
 
@@ -266,7 +267,9 @@ def wrapped_train(
         use_distributed_sampler=False,
         deterministic="warn" if hparams.debug else None,
         detect_anomaly=hparams.debug,
+        # val_check_interval=0.01,
     )
+    # model = torch.compile(model, dynamic=True)
     trainer.fit(model)
 
     if not hparams.debug and not hparams.no_wandb and wandb_info is not None:
